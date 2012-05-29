@@ -1,0 +1,1140 @@
+#!/bin/sh
+########################################################################
+#
+# 2011-02-09
+# Jonas Pasche
+# jpasche@jonaspasche.com
+#
+########################################################################
+#
+#       This program is free software: you can redistribute it and/or modify
+#       it under the terms of the GNU General Public License as published by
+#       the Free Software Foundation, either version 3 of the License, or
+#       (at your option) any later version.
+#
+#       This program is distributed in the hope that it will be useful,
+#       but WITHOUT ANY WARRANTY; without even the implied warranty of
+#       MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#       GNU General Public License for more details.
+#
+#       You should have received a copy of the GNU General Public License
+#       along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+########################################################################
+#
+# This script checks if a Uberspace.de host fulfills all requirements.
+#
+########################################################################
+
+
+## variables to contain basic statistics
+
+PASSED=0
+FAILED=0
+SSLFRONTEND=`grep ^SSLFRONTEND /usr/local/sbin/uberspace-account-local-settings.sh | cut -d= -f2`
+
+
+## this can be different 
+
+if [ "$SSLFRONTEND" == "pound" ]; then
+  # pound only
+  POUND=1
+fi
+if [ "$SSLFRONTEND" == "mod_ssl_and_pound" ]; then
+  # pound as additional service
+  MODSSL_POUND=1
+fi
+
+## helper functions
+
+file_should_exist() {
+  if [ -f $1 ] ; then
+    pass "$1 exists (and is a file)"
+  else
+    fail "$1 does not exist (or isn't a file)"
+  fi
+}
+
+file_should_not_exist() {
+  if [ -f $1 ] ; then
+    fail "$1 exist (but it shouldn't)"
+  else
+    pass "$1 does not exist (it shouldn't, so that's okay)"
+  fi
+}
+
+symlink_should_exist() {
+  if [ -L $1 ] ; then
+    pass "$1 exists (and is a symlink)"
+  else
+    fail "$1 does not exist (or isn't a symlink)"
+  fi
+}
+
+directory_should_exist() {
+  if [ -d $1 ] ; then
+    pass "$1 exists (and is a directory)"
+  else
+    fail "$1 does not exist (or isn't a directory)"
+  fi
+}
+
+directory_should_not_exist() {
+  if [ -d $1 ] ; then
+    fail "$1 exists (but it shouldn't)"
+  else
+    pass "$1 does not exist (it shouldn't, so that's okay)"
+  fi
+}
+
+service_should_exist() {
+  symlink_should_exist /service/$1
+}
+
+package_should_exist() {
+  symlink_should_exist /package/host/localhost/$1
+}
+
+file_should_contain() {
+  grep -qsE "$2" $1
+  if [ "$?" = "0" ] ; then
+    pass "$1 contains \"$2\""
+  else
+    fail "$1 does not contain \"$2\""
+  fi
+}
+
+file_should_not_contain() {
+  grep -qsE "$2" $1
+  if [ "$?" = "0" ] ; then
+    fail "$1 contains \"$2\" (but it shouldn't)"
+  else
+    pass "$1 does not contain \"$2\" (it shouldn't, so that's okay)"
+  fi
+}
+
+binary_should_contain() {
+  if [ -e $1 ] ; then
+    strings $1 | grep -qE "$2"
+    if [ "$?" = "0" ] ; then
+      pass "$1 contains \"$2\""
+    else
+      fail "$1 does not contain \"$2\""
+    fi
+  else
+    fail "$1 does not exist (checking for \"$2\")"
+  fi
+}
+
+binary_should_not_contain() {
+  if [ -e $1 ] ; then
+    strings $1 | grep -qE "$2"
+    if [ "$?" = "0" ] ; then
+      fail "$1 contains \"$2\" (but it shouldn't)"
+    else
+      pass "$1 does not contain \"$2\" (it shouldn't, so that's okay)"
+    fi
+  else
+    fail "$1 does not exist (checking for \"$2\")"
+  fi
+}
+
+file_needs_permissions() {
+  if [ -e $1 ] ; then
+    if [ "`stat -c %a $1`" = "$2" ] ; then
+      pass "$1 has correct permissions ($2)"
+    else
+      fail "$1 does not have correct permissions ($2)"
+    fi
+  else
+    fail "$1 does not exist (checking for permissions $2)"
+  fi
+}
+
+file_needs_size() {
+  if [ -e $1 ] ; then
+    if [ "`stat -c %s $1`" = "$2" ] ; then
+      pass "$1 has correct size of $2 bytes"
+    else
+      if [ "$3" = "" ] ; then
+        fail "$1 does not have correct size of $2 bytes"
+      else
+        fail "$1 does not have correct size of $2 bytes ($3)"
+      fi
+    fi
+  else
+    fail "$1 does not exist (checking for size of $2 bytes)"
+  fi
+}
+
+command_should_exist() {
+  _WHICH=`which $1 2>/dev/null`
+  if [ "$_WHICH" = "" ] ; then
+    fail "$1 is not a valid command"
+  else
+    pass "$1 can be found at $_WHICH"
+  fi
+}
+
+owner_should_be() {
+  if [ "`stat --printf=%U $1`" = "$2" ] ; then
+    pass "user of $1 is $2"
+  else
+    fail "user of $1 is NOT $2"
+  fi
+}
+
+group_should_be() {
+  if [ "`stat --printf=%G $1`" = "$2" ] ; then
+    pass "group of $1 is $2"
+  else
+    fail "group of $1 is NOT $2"
+  fi
+}
+
+permissions_should_be() {
+  if [ "`stat --printf=%a $1`" = "$2" ] ; then
+    pass "permissions of $1 are $2"
+  else
+    fail "permissions of $1 are NOT $2"
+  fi
+}
+
+command_should_succeed() {
+  $1 1>/dev/null 2>&1
+  if [ "$?" = "0" ] ; then
+    pass "command '$1' succeeded"
+  else
+    fail "command '$1' failed ($2)"
+  fi
+}
+
+file_should_have_attr() {
+  if [ -e $1 ] ; then
+    lsattr $1 | awk '{ print $1 }' | grep -qs $2
+    if [ "$?" = "0" ] ; then
+      pass "$1 has attr \"$2\""
+    else
+      fail "$1 does not have attr \"$2\""
+    fi
+  else
+    fail "$1 does not exist"
+  fi
+}
+
+pass() {
+  echo "  + $1";
+  (( PASSED += 1 ))
+}
+
+fail() {
+  echo "  - $1";
+  (( FAILED += 1 ))
+}
+
+
+## all those different checks
+
+check_common() {
+
+  if [ "`dnsdomainname`" = "uberspace.de" ] ; then
+    pass "dnsdomainname resolves to uberspace.de"
+  else
+    fail "dnsdomainname does not resolve to uberspace.de"
+  fi
+
+  service_should_exist clear
+
+  file_should_exist /bin/zsh
+  file_should_exist /usr/local/bin/uberspace-forward-primary-address
+
+  file_should_contain /etc/default/useradd CREATE_MAIL_SPOOL=no
+  file_should_contain /etc/pam.d/sshd "pam_mail.so dir=~/Maildir"
+
+  # readline-devel RPM, not needed for us, but users might want to compile software against it
+  file_should_exist /usr/include/readline/readline.h
+
+  # yum install ncurses-devel, not needed for us, but users might want to compile software against it
+  file_should_exist /usr/include/ncurses.h
+
+  # fcgi-devel RPM, not needed for us, but users might want to compile software against it
+  file_should_exist /usr/include/fastcgi.h
+
+  # mysql-devel RPM, not needed for us, but users might want to compile software against it
+  file_should_exist /usr/include/mysql/mysql.h
+
+  # at least PHP compilation needs this (libtool-ltdl-devel)
+  file_should_exist /usr/lib*/libltdl.so
+
+  # yum install gd-devel
+  command_should_exist gdlib-config
+
+  # yum install screen
+  command_should_exist screen
+
+  # yum install tmux
+  command_should_exist tmux
+
+  # yum install irssi
+  command_should_exist irssi
+
+  # yum install libotr
+  file_should_exist /usr/lib*/libotr.so.2
+
+  # simply copy from any other uberspace host
+  file_should_exist /home/000-README
+
+  # this file should definitely be immutable (it contains host-specific settings)
+  file_should_have_attr /usr/local/sbin/uberspace-account-local-settings.sh i
+
+  # yum install bison (needed to compile e.g. mono)
+  command_should_exist bison
+
+  # yum install getmail
+  command_should_exist getmail
+
+  # yum install toast (from prettyRPMs)
+  command_should_exist toast
+  file_should_exist /etc/profile.d/toast.sh
+
+  # yum install curl-devel
+  command_should_exist curl-config
+
+  # yum install libxml2-devel
+  command_should_exist xml2-config
+
+  # yum install libxslt-devel
+  command_should_exist xslt-config
+
+  # yum install mc
+  command_should_exist mc
+
+  # yum install libyaml-devel (for Ruby compilation)
+  file_should_exist /usr/include/yaml.h
+
+  # yum install libicu-devel
+  command_should_exist icu-config
+
+  # yum install lynx
+  command_should_exist lynx
+
+  # ca-bundle.crt on CentOS 5 is outdated and is missing the DigiCert root certificate
+  # which affects especially https://github.com/ - quick fix:
+  # curl https://www.digicert.com/testroot/DigiCertHighAssuranceEVRootCA.crt >> /etc/pki/tls/certs/ca-bundle.crt
+  file_should_contain /etc/pki/tls/certs/ca-bundle.crt "MIIDxTCCAq2gAwIBAgIQAqxcJmoLQJuPC3nyrkYldzANBgkqhkiG9w0BAQUFADBs"
+
+  # yum install lftp
+  command_should_exist lftp
+
+  # needed for our nagios/icinga check
+  file_should_exist /home/dbcheck/cgi-bin/check
+
+  # yum install imapsync
+  command_should_exist imapsync
+
+  # yum install glib2-devel.x86_64
+  # needed for e.g. "toast arm bitlbee"
+  file_should_exist /lib*/libglib-2.0.so
+
+  # yum install libgdiplus
+  file_should_exist /usr/lib*/libgdiplus.so.0
+
+  # yum install zip
+  command_should_exist zip
+
+  # yum install libtasn1
+  file_should_exist /usr/lib*/libtasn1.so.3
+
+  # manually compiled openssl 1.0.0g for pound
+  package_should_exist openssl
+
+  # openssl does not ship a CA bundle by default, symlink the global one
+  symlink_should_exist /package/host/localhost/openssl/ssl/cert.pem
+
+}
+
+
+check_privacy() {
+
+  # wtmp contain usernames combined with timestamps and IP addresses;
+  # should not be publically readable.
+  permissions_should_be /var/log/wtmp 660
+
+  # As wtmp is rotated, we have to check logrotate.conf, too. This is a
+  # very dumb check because "/var/log/wtmp {" and "create 0660 root utmp"
+  # are on different lines; we would need a more sophisticated
+  # file_should_contain function here. But for now this simply works
+  # because no other block contains "create 0660 root utmp", and as
+  # most configuration is done in /etc/logrotate.d this is unlikely to
+  # happen in the future.
+  file_should_contain /etc/logrotate.conf "create 0660 root utmp"
+
+  # wtmp contain usernames combined with timestamps and IP addresses;
+  # should not be publically readable. It is not rotated because it's
+  # not a log, but a status file (belongs to initscripts).
+  permissions_should_be /var/run/utmp 660
+
+  # "The lastlog file is a database which contains info on the last
+  # login of each user. You should not rotate it."
+  # Well, if it's a database and not a log, why is it located in
+  # /var/log then? Anyway, it should not be publically readable.
+  permissions_should_be /var/log/lastlog 600
+
+}
+
+check_netqmail() {
+
+  file_should_exist /etc/profile.d/qmail.sh
+  file_should_exist /etc/profile.d/maildir.sh
+
+  service_should_exist qmail-smtpd
+  service_should_exist qmail-smtpd-ssl
+  service_should_exist qmail-send
+  service_should_exist qmail-relay-send
+  service_should_exist qmail-submit
+  service_should_exist uberspace-generate-validrcptto
+  service_should_exist conditional_qmail-send_restart
+
+  service_should_exist update_tmprsadh
+  file_should_contain /service/update_tmprsadh/doit "HOME=/root"
+  file_should_contain /service/update_tmprsadh/doit "/var/qmail/bin/update_tmprsadh"
+  file_should_contain /service/update_tmprsadh/doit "/var/qmail-relay/bin/update_tmprsadh"
+
+  # for auth-logger
+  file_should_contain /service/qmail-smtpd/run "uberspace-smtp-auth-logger"
+  file_should_contain /service/qmail-smtpd-ssl/run "uberspace-smtp-auth-logger"
+  file_should_contain /service/qmail-submit/run "uberspace-smtp-auth-logger"
+
+  directory_should_exist /var/qmail/control/morercpthosts.d
+  file_should_exist /var/qmail/control/morercpthosts
+  # privacy reasons (only qmaild needs to read this)
+  permissions_should_be /var/qmail/control/morercpthosts.d 700
+  owner_should_be /var/qmail/control/morercpthosts qmaild
+  permissions_should_be /var/qmail/control/morercpthosts 600
+
+  directory_should_exist /var/qmail/control/virtualdomains.d
+  file_should_exist /var/qmail/control/virtualdomains
+  # privacy reasons (only qmails needs to read this)
+  permissions_should_be /var/qmail/control/virtualdomains.d 700
+  owner_should_be /var/qmail/control/virtualdomains qmails
+  permissions_should_be /var/qmail/control/virtualdomains 600
+
+  directory_should_exist /etc/skel/Maildir
+
+  # for incoming mail
+  file_should_exist /var/qmail/control/validrcptto.cdb
+  file_should_exist /var/qmail/control/dh1024.pem
+  file_should_exist /var/qmail/control/dh512.pem
+  file_should_exist /var/qmail/control/rsa512.pem
+  file_should_exist /var/qmail/control/servercert.pem
+
+  binary_should_contain /var/qmail/bin/qmail-smtpd validrcptto.cdb
+  binary_should_contain /var/qmail/bin/qmail-smtpd STARTTLS
+  binary_should_contain /var/qmail/bin/qmail-smtpd AUTH
+
+  binary_should_not_contain /var/qmail/bin/qmail-smtpd CRAM-MD5
+
+  file_should_contain /service/qmail-smtpd/run checkvpw
+  file_should_contain /service/qmail-smtpd/run ix.dnsbl.manitu.net
+  file_should_contain /service/qmail-smtpd/run bl.spamcop.net
+  file_should_contain /var/qmail/control/me .uberspace.de
+
+  # for outgoing mail
+  file_should_exist /var/qmail-relay/control/dh1024.pem
+  file_should_exist /var/qmail-relay/control/dh512.pem
+  file_should_exist /var/qmail-relay/control/rsa512.pem
+  file_should_exist /var/qmail-relay/control/servercert.pem
+
+  binary_should_contain /var/qmail-relay/bin/qmail-smtpd STARTTLS
+  binary_should_contain /var/qmail-relay/bin/qmail-smtpd AUTH
+
+  binary_should_not_contain /var/qmail-relay/bin/qmail-smtpd CRAM-MD5
+
+  symlink_should_exist /usr/sbin/sendmail
+
+  file_should_contain /var/qmail/alias/.qmail-postmaster support@jonaspasche.com
+
+  # the StartCom class 2 intermediate certificate needs to be contained here (sub.class2.server.ca.pem)
+  file_should_contain /var/qmail/control/servercert.pem MIIH4zCCBcugAwIBAgIBCzANBgkqhkiG9w0BAQUFADB9MQswCQYDVQQGEwJJTDEW
+  file_should_contain /var/qmail-relay/control/servercert.pem MIIH4zCCBcugAwIBAgIBCzANBgkqhkiG9w0BAQUFADB9MQswCQYDVQQGEwJJTDEW
+
+  file_should_contain /var/qmail/rc QMAILQUEUE=/var/qmail-relay/bin/qmail-queue
+
+}
+
+
+check_vmailmgr() {
+
+  file_should_exist /usr/bin/checkvpw
+  file_should_exist /etc/vmailmgr/vdeliver-predeliver
+  file_should_exist /etc/vmailmgr/vdeliver-postdeliver
+
+  command_should_exist checkvpw-dovecot-wrapper
+  command_should_exist vadduser
+
+  file_needs_permissions /usr/bin/checkvpw 6755
+
+  file_needs_size /usr/bin/vchforwards 53120 "maildir patch not applied?"
+  file_needs_size /etc/vmailmgr/postmaster-aliases 0 "please create empty postmaster-aliases"
+
+}
+
+
+check_dovecot() {
+
+  service_should_exist dovecot
+
+  if [ -d /service/dovecot/conf.d ]; then
+    # we're dealing with a 2-series dovecot
+    file_should_contain /service/dovecot/dovecot.conf "listen = \*, ::"
+    file_should_contain /service/dovecot/dovecot.conf "protocols = imap pop3"
+    file_should_contain /service/dovecot/conf.d/10-auth.conf "disable_plaintext_auth = yes"
+    file_should_contain /service/dovecot/conf.d/10-ssl.conf "ssl = required"
+    file_should_contain /service/dovecot/conf.d/10-master.conf "executable = script-login -d /usr/local/bin/uberspace-pop3-auth-logger"
+    file_should_contain /service/dovecot/conf.d/10-master.conf "executable = script-login -d /usr/local/bin/uberspace-imap-auth-logger"
+    file_should_contain /service/dovecot/conf.d/10-master.conf "executable = imap imap-postlogin"
+    file_should_contain /service/dovecot/conf.d/10-master.conf "executable = pop3 pop3-postlogin"
+    file_should_contain /service/dovecot/conf.d/auth-checkvpw-dovecot-wrapper.conf.ext "args = /usr/bin/checkvpw-dovecot-wrapper"
+    DOVECOT_CERTFILE=`grep ^ssl_cert /service/dovecot/conf.d/10-ssl.conf | sed -r 's/.*= ?<?//'`
+  else
+    # we're dealing with a 1-series dovecot
+    file_should_contain /service/dovecot/dovecot.conf "listen = \*, \[::\]"
+    file_should_contain /service/dovecot/dovecot.conf "protocols = imaps imap pop3s pop3"
+    file_should_contain /service/dovecot/dovecot.conf "disable_plaintext_auth = yes"
+    file_should_contain /service/dovecot/dovecot.conf "ssl = required"
+    file_should_contain /service/dovecot/dovecot.conf "mail_drop_priv_before_exec = yes"
+    file_should_contain /service/dovecot/dovecot.conf "mail_executable = /usr/local/bin/uberspace-imap-auth-logger /package/host/localhost/dovecot/libexec/dovecot/imap"
+    file_should_contain /service/dovecot/dovecot.conf "mail_executable = /usr/local/bin/uberspace-pop3-auth-logger /package/host/localhost/dovecot/libexec/dovecot/pop3"
+    file_should_contain /service/dovecot/dovecot.conf "args = /usr/local/bin/checkvpw-dovecot-wrapper"
+    DOVECOT_CERTFILE=`grep ^ssl_cert /service/dovecot/dovecot.conf | sed -r 's/.*= ?<?//'`
+  fi
+
+  # the StartCom class 2 intermediate certificate needs to be contained here (sub.class2.server.ca.pem)
+  file_should_contain $DOVECOT_CERTFILE MIIH4zCCBcugAwIBAgIBCzANBgkqhkiG9w0BAQUFADB9MQswCQYDVQQGEwJJTDEW
+
+}
+
+
+check_tcpserver() {
+
+  binary_should_contain /usr/local/bin/tcpserver TCP6
+
+  command_should_exist tcpserver
+}
+
+
+check_phpmyadmin() {
+
+  file_should_exist /etc/httpd/conf.d/virtual.pma.conf
+  if ! [ $POUND ] ; then
+    file_should_exist /etc/httpd/conf.d/ssl.pma.conf
+  fi
+  file_should_exist /usr/share/phpMyAdmin/libraries/vendor_config.php
+  file_should_exist /etc/phpMyAdmin/config.inc.php
+
+  file_should_contain /etc/httpd/conf.d/virtual.pma.conf "DocumentRoot /usr/share/phpMyAdmin"
+  if ! [ $POUND ] ; then
+    file_should_contain /etc/httpd/conf.d/ssl.pma.conf "DocumentRoot /usr/share/phpMyAdmin"
+  fi
+  file_should_contain /usr/share/phpMyAdmin/libraries/vendor_config.php "CONFIG_FILE', CONFIG_DIR . 'config.inc.php"
+
+  if ! [ $POUND ] ; then
+    file_should_contain /etc/phpMyAdmin/config.inc.php "\\\$cfg\['ForceSSL'\] = true"
+  fi
+  file_should_contain /etc/phpMyAdmin/config.inc.php "\\\$cfg\['blowfish_secret'\] = '.+'"
+  file_should_contain /etc/phpMyAdmin/config.inc.php "\\\$cfg\['DefaultLang'\] = 'de-utf-8'"
+
+  group_should_be /etc/phpMyAdmin/config.inc.php pma
+  permissions_should_be /etc/phpMyAdmin/config.inc.php 640
+}
+
+
+check_adminer() {
+
+  file_should_exist /etc/httpd/conf.d/virtual.adminer.conf
+  if ! [ $POUND ] ; then
+    file_should_exist /etc/httpd/conf.d/ssl.adminer.conf
+  fi
+  file_should_exist /var/www/virtual/adminer/html/adminer.php
+
+  file_should_contain /var/www/virtual/adminer/html/.htaccess "DirectoryIndex adminer.php"
+}
+
+
+check_roundcube() {
+
+  file_should_exist /etc/httpd/conf.d/virtual.webmail.conf
+  if ! [ $POUND ] ; then
+    file_should_exist /etc/httpd/conf.d/ssl.webmail.conf
+  fi
+  file_should_exist /home/webmail/html/config/main.inc.php
+  file_should_exist /home/webmail/html/plugins/login_info/config.inc.php
+
+  file_should_contain /home/webmail/html/config/main.inc.php "\\\$rcmail_config\['plugins'\].*'login_info'"
+  if ! [ $POUND ] ; then
+    file_should_contain /home/webmail/html/config/main.inc.php "\\\$rcmail_config\['force_https'\] = true"
+  fi
+  file_should_contain /home/webmail/html/config/main.inc.php "\\\$rcmail_config\['des_key'\] = '.{24}'"
+  file_should_contain /home/webmail/html/config/main.inc.php "\\\$rcmail_config\['language'\] = 'de_DE'"
+  file_should_contain /home/webmail/html/config/main.inc.php "\\\$rcmail_config\['smtp_port'\] = 587"
+
+  file_should_not_contain /home/webmail/html/config/main.inc.php "\\\$rcmail_config\['spellcheck_engine'\] = 'googie'"
+  file_should_not_contain /home/webmail/html/config/main.inc.php "\\\$rcmail_config\['default_host'\] = ''"
+  file_should_not_contain /home/webmail/html/config/main.inc.php "\\\$rcmail_config\['default_host'\] = 'localhost'"
+}
+
+
+check_apache() {
+
+  directory_should_exist     /var/log/fastcgi
+  directory_should_not_exist /var/log/httpd/fastcgi
+  service_should_exist       handle_virtual_logs
+
+  file_should_not_exist /usr/lib*/httpd/modules/mod_perl.so
+  file_should_not_exist /usr/lib*/httpd/modules/mod_php?.so
+
+  if [ -f /etc/httpd/conf.d/fcgid.conf ] ; then
+    file_should_contain /etc/httpd/conf.d/fcgid.conf "FcgidMaxRequestLen 67108864"
+  fi
+
+  # Workaround for an unfixed Apache bug:
+  # http://seclists.org/fulldisclosure/2011/Aug/241
+  file_should_contain /etc/httpd/conf/dyncontent.conf "HTTP:Range"
+
+  # privacy reasons (only root needs to read this)
+  permissions_should_be /etc/httpd/conf.d 700
+}
+
+check_pound() {
+
+  if [[ $POUND -eq 1 || $MODSSL_POUND -eq 1 ]] ; then
+    service_should_exist pound
+    directory_should_exist /var/pound
+    file_should_exist /etc/pound.cfg 
+    file_should_exist /etc/httpd/conf.d/mod_rpaf.conf
+    # otherwise Pound would not allow WebDAV
+    file_should_contain /etc/pound.cfg "xHTTP 2"
+    # MUST contain PRIMARY address of the host in question
+    file_should_not_contain /etc/httpd/conf.d/mod_rpaf.conf "^RPAF_ProxyIPs.+127.0.0.1"
+  fi
+}
+
+check_stats() {
+
+  group_should_be /etc/shadow apache
+  permissions_should_be /etc/shadow 440
+
+  file_should_contain /etc/httpd/conf.d/virtual.stats.conf "DocumentRoot /var/www/html/stats"
+  if ! [ $POUND ] ; then
+    file_should_contain /etc/httpd/conf.d/ssl.stats.conf "DocumentRoot /var/www/html/stats"
+  fi
+  directory_should_exist /var/www/html/stats
+
+  # HTTPS redirection script
+  file_should_exist /var/www/virtual/stats/cgi-bin/redirect
+
+  file_should_contain /var/www/html/stats/.htaccess "ErrorDocument 403"
+  file_should_contain /var/www/html/stats/.htaccess "SSLRequireSSL"
+  file_should_contain /var/www/html/stats/.htaccess "SSLOptions \+StrictRequire"
+
+}
+
+
+check_maildrop() {
+
+  #file_should_exist /usr/bin/maildrop
+  command_should_exist maildrop
+}
+
+
+check_qmail_autoresponder() {
+
+  #file_should_exist /usr/bin/qmail-autoresponder
+  command_should_exist qmail-autoresponder
+}
+
+
+check_php() {
+
+  package_should_exist php-5
+  package_should_exist php-5.2
+  package_should_exist php-5.3
+  package_should_exist php-5.4
+
+  for PHPDIR in /package/host/localhost/php* ; do
+    # only check real directories, not symlinks
+    if [ -d $PHPDIR -a ! -L $PHPDIR ] ; then
+      if [ -e $PHPDIR/sbin/php-fpm ] ; then
+        # FPM version
+        file_should_exist $PHPDIR/sbin/php-fpm
+      else
+	# CGI version
+        file_should_exist $PHPDIR/bin/php-cgi
+      fi
+      file_should_exist $PHPDIR/bin/php
+      file_should_exist $PHPDIR/bin/pear
+      file_should_exist $PHPDIR/lib/php.ini
+      file_should_contain $PHPDIR/lib/php.ini "^date.timezone.*Europe/Berlin"
+      file_should_contain $PHPDIR/lib/php.ini "^upload_max_filesize.*64M"
+      file_should_contain $PHPDIR/lib/php.ini "^post_max_size.*64M"
+      file_should_contain $PHPDIR/lib/php.ini "^sendmail_path.*/var/qmail-relay/bin/qmail-inject"
+    fi
+  done
+
+  file_should_exist /etc/profile.d/phpversion.sh
+  command_should_exist php
+}
+
+
+check_nodejs() {
+
+  package_should_exist nodejs
+
+  # two different versions
+  package_should_exist nodejs-0.4
+  package_should_exist nodejs-0.6
+
+  # symlinks of the default version to /usr/local/bin
+  command_should_exist node
+  command_should_exist node-waf
+}
+
+
+check_ezmlm_idx() {
+
+  #directory_should_exist /usr/local/bin/ezmlm
+  file_should_exist /usr/local/bin/ezmlm-make
+
+  command_should_exist ezmlm-make
+}
+
+
+check_perl() {
+
+  file_should_exist /usr/bin/perl
+  command_should_exist perl
+
+  # some commonly used modules
+
+  # perl-DBD-mysql
+  file_should_exist /usr/lib*/perl5/vendor_perl/*/*-linux-thread-multi/DBD/mysql.pm
+  # perl-MIME-Lite
+  file_should_exist /usr/lib*/perl5/vendor_perl/*/MIME/Lite.pm
+  # perl-Compress-Zlib
+  if [ -e /usr/lib*/perl5/vendor_perl/*/*-linux-thread-multi/Compress/Zlib.pm ] ; then
+    pass "/usr/lib*/perl5/vendor_perl/*/*-linux-thread-multi/Compress/Zlib.pm exists (and is a file)" 
+  elif [ -e /usr/lib/perl5/vendor_perl/*/Compress/Zlib.pm ] ; then
+    pass "/usr/lib*/perl5/vendor_perl/*/Compress/Zlib.pm exists (and is a file)" 
+  else
+    fail "/usr/lib*/perl5/*/.../*/Compress/Zlib.pm does not exist (or isn't a file)"
+  fi
+  # perl-Net-FTPSSL
+  file_should_exist /usr/lib*/perl5/vendor_perl/*/Net/FTPSSL.pm
+  # perl-TimeDate
+  file_should_exist /usr/lib*/perl5/vendor_perl/*/Date/Format.pm
+  # perl-XML-Parser
+  file_should_exist /usr/lib*/perl5/vendor_perl/*/*-linux-thread-multi/XML/Parser.pm
+  # perl-XML-Writer
+  file_should_exist /usr/lib*/perl5/vendor_perl/*/XML/Writer.pm
+  # perl-libwww-perl
+  file_should_exist /usr/lib*/perl5/vendor_perl/*/LWP/UserAgent.pm
+  # perl-HTML-Parser
+  file_should_exist /usr/lib*/perl5/vendor_perl/*/*-linux-thread-multi/HTML/Parser.pm
+  # perl-FCGI (from rpmforge)
+  file_should_exist /usr/lib*/perl5/vendor_perl/*/*-linux-thread-multi/FCGI.pm
+}
+
+check_locate() {
+  command_should_exist locate
+}
+
+check_python() {
+
+  # there should be a generic python with setuptools
+  command_should_exist python
+  command_should_exist easy_install
+
+  # python 2.4 is the default of centos 5
+  command_should_exist python2.4
+  # from the python-setuptools rpm
+  command_should_exist easy_install-2.4
+
+  # python 2.7 is manually compiled ... but should be in the path, too
+  command_should_exist python2.7
+  # manually installed from http://pypi.python.org/pypi/setuptools
+  command_should_exist easy_install-2.7
+
+  # python 3.2 is manually compiled ... but should be in the path, too
+  # ln -s /package/host/localhost/python-3.2/bin/*3* /usr/local/bin
+  command_should_exist python3.2
+  command_should_exist easy_install-3.2
+  command_should_exist pip-3.2
+
+  # http://peak.telecommunity.com/DevCenter/EasyInstall#administrator-installation
+  file_should_exist /usr/lib*/python*/site-packages/altinstall.pth
+  file_should_exist /usr/lib*/python*/distutils/distutils.cfg
+
+  # python-sqlite rpm
+  directory_should_exist /usr/lib*/python*/site-packages/sqlite
+  # python-sqlite2 rpm
+  directory_should_exist /usr/lib*/python*/site-packages/pysqlite2
+  # python-setuptools rpm
+  directory_should_exist /usr/lib*/python*/site-packages/setuptools
+  # python genshi rpm
+  directory_should_exist /usr/lib*/python*/site-packages/genshi
+  # MySQL-python rpm
+  directory_should_exist /usr/lib*/python*/site-packages/MySQLdb
+  # python-babel rpm
+  directory_should_exist /usr/lib*/python*/site-packages/babel
+  # python-docutils rpm
+  directory_should_exist /usr/lib*/python*/site-packages/docutils
+  # python-pygments rpm
+  directory_should_exist /usr/lib*/python*/site-packages/pygments
+  # pytz rpm
+  directory_should_exist /usr/lib*/python*/site-packages/pytz
+
+  for PYTHONDIR in /package/host/localhost/python-* ; do
+    # only check real directories, not symlinks
+    if [ -d $PYTHONDIR -a ! -L $PYTHONDIR ] ; then
+
+      # manually installed from http://pypi.python.org/pypi/setuptools
+      file_should_exist $PYTHONDIR/bin/easy_install
+
+      # manually compiled python setups should be configured the same way
+      # http://peak.telecommunity.com/DevCenter/EasyInstall#administrator-installation
+      file_should_exist $PYTHONDIR/lib*/python*/site-packages/altinstall.pth
+      file_should_exist $PYTHONDIR/lib*/python*/distutils/distutils.cfg
+
+      # some things are different between python 2 and 3
+      echo $PYTHONDIR | grep -qs python-3
+      if [ "$?" = "0" ] ; then
+        # we need a binary (python 3 installs itself as "python3")
+        file_should_exist $PYTHONDIR/bin/python3
+        # python should be compiled with sqlite3 support (sqlite-devel needs to be installed on compile time)
+        file_should_exist $PYTHONDIR/lib*/python*/lib-dynload/_sqlite3.cpython-32m.so
+        # no MySQL support for python 3 yet!
+      else
+        # we need a binary (python 2 installs itself as "python")
+        file_should_exist $PYTHONDIR/bin/python
+        # python should be compiled with sqlite3 support (sqlite-devel needs to be installed on compile time)
+        file_should_exist $PYTHONDIR/lib*/python*/lib-dynload/_sqlite3.so
+        # global MySQL support ("easy_install-2.7 MySQL-python" BEFORE setting up distutils.cfg)
+        file_should_exist $PYTHONDIR/lib*/python*/site-packages/MySQL_python-*.egg
+      fi
+
+    fi
+  done
+}
+
+check_sqlite() {
+
+  package_should_exist sqlite
+}
+
+check_ruby() {
+
+  file_should_exist /usr/bin/ruby
+  file_should_exist /usr/bin/rails
+  file_should_exist /usr/bin/mongrel_rails
+
+  directory_should_exist /usr/lib/ruby/site_ruby/*/sqlite3
+
+  command_should_exist ruby
+
+  package_should_exist ruby
+  package_should_exist ruby-1.8
+  package_should_exist ruby-1.9
+
+  # Ruby 1.8 does NOT automatically come with "gem"; need to install RubyGems ourselves
+  file_should_exist /package/host/localhost/ruby-1.8/bin/gem
+
+  # Let's pre-compile the newest sqlite3 gem against our separate sqlite3 installation
+  # /package/host/localhost/ruby-1.9/bin/gem install sqlite3 -- \
+  #   --with-sqlite3-include=/package/host/localhost/sqlite-3/include \
+  #   --with-sqlite3-lib=/package/host/localhost/sqlite-3/lib
+  file_should_exist /package/host/localhost/ruby-1.9/lib/ruby/gems/1.9.1/gems/sqlite3-*/lib/sqlite3.rb
+
+}
+
+check_editors() {
+
+  # manually compiled
+  package_should_exist vim
+  command_should_exist vim7.3
+
+  # yum install joe
+  command_should_exist joe
+
+  # yum install vim-enhanced
+  command_should_exist vim
+}
+
+check_mongodb() {
+
+  command_should_exist mongo
+  command_should_exist mongod
+}
+
+check_couchdb() {
+
+  command_should_exist couchdb
+  file_should_exist /etc/couchdb/default.ini
+}
+
+check_uberroot() {
+
+  file_should_contain /home/uberroot/.ssh/authorized_keys "AAAAB3NzaC1yc2EAAAABIwAAAQEAzemLn04VCUIZuoGiQ89mU6y5Oq4FBO1oFIusBm0uy/jggZrezl50/ntDFbSdCvd8P4xKr\+\+hFN/ug7SkikEULFwQ2efDw7RU45I4iT74St2v7Oa3L/cFV3RNB1sazkzfNyyogwKoykzrD69oRtJLwLsMY09JIMTS7erzIgWimMq5xo2/jzDcfRXaqsO8SDVuQE40SLe3xZz7cXdVRWmG2h\+XCpsc8AbqlU0RtcomaT2Lz44lQHMJpZA7bBU6WkFNB52PvQEiQTIOxByTmKB9kVCZeSCyn/q5Y\+E9pykYAsqTmZzT8DD/oa7O3QvVlI\+8suA9QLcNFZszGdosi4YtTQ=="
+  file_should_contain /etc/sudoers "^uberroot "
+}
+
+check_vcs() {
+
+  # yum install subversion
+  command_should_exist svn
+  # yum install mercurial
+  command_should_exist hg
+  # yum install git
+  command_should_exist git
+  # yum install git-svn
+  if [ -e /usr/libexec/git-core/git-pull ] ; then
+    # newer git versions (from rpmforge)
+    file_should_exist /usr/libexec/git-core/git-pull
+  else
+    # older git versions (from centos)
+    command_should_exist git-svn
+  fi
+  # yum install cvs
+  command_should_exist cvs
+  # yum install bzr
+  command_should_exist bzr
+}
+
+check_imagemagick() {
+
+  # yum install ImageMagick
+  command_should_exist convert
+  # yum install ImageMagick-devel
+  command_should_exist Magick-config
+}
+
+check_gitolite() {
+
+  package_should_exist gitolite
+  command_should_exist gl-setup
+
+  # ln -s /package/host/localhost/gitolite/{gitolite,gl,sshkeys}* /usr/local/bin
+  command_should_exist gl-install
+  command_should_exist sshkeys-lint
+}
+
+check_webalizer() {
+
+  command_should_exist webalizer
+  file_should_contain /etc/webalizer.conf '^#LogFile'
+  file_should_contain /etc/webalizer.conf '^#OutputDir'
+  file_should_contain /etc/webalizer.conf '^HistoryName webalizer.hist'
+  file_should_contain /etc/webalizer.conf '^IncrementalName webalizer.current'
+
+  file_should_contain /service/handle_virtual_logs/handle_virtual_logs "webalizer -n \\\$_.`hostname --fqdn`"
+}
+
+check_muas() {
+
+  command_should_exist mutt
+  command_should_exist alpine
+}
+
+check_spamassassin() {
+
+  command_should_exist spamd
+  command_should_exist spamc
+  service_should_exist spamd
+
+  command_should_exist sa-update
+  service_should_exist sa-update
+
+  # use SpamAssassin 3.3 from http://pkgs.repoforge.org/spamassassin/
+  file_should_exist /etc/mail/spamassassin/v330.pre
+
+  file_should_contain /etc/mail/spamassassin/local.cf 'score FH_DATE_PAST_20XX 0'
+  file_should_contain /etc/mail/spamassassin/local.cf 'score RDNS_NONE 0'
+
+  # Are both GnuPG keys (SpamAssassin and dostech.net) imported and correctly listed?
+  # wget http://spamassassin.apache.org/updates/GPG.KEY && sa-update --import GPG.KEY && rm -f GPG.KEY  
+  for KEYID in 5244EC45 ; do
+    file_should_contain /etc/mail/spamassassin/keys ${KEYID}
+    command_should_succeed "gpg --list-keys --homedir /etc/mail/spamassassin/sa-update-keys ${KEYID}" "missing GnuPG key"
+  done
+
+}
+
+check_google_authenticator() {
+
+  # Support for two-way authentication
+  # http://code.google.com/p/google-authenticator/
+
+  # Command to create a user's configuration
+  command_should_exist google-authenticator
+
+  # PAM module
+  file_should_exist /lib*/security/pam_google_authenticator.so
+
+  # google-authenticator needs to be patched to support selective opt-in
+  # http://code.google.com/p/google-authenticator/issues/detail?id=18
+  file_needs_size /lib*/security/pam_google_authenticator.so 101491 "ignore_nofile.patch not applied?"
+
+  # Are the configuration files adapted for use of google-authenticator?
+  file_should_contain /etc/ssh/sshd_config '^ChallengeResponseAuthentication yes'
+  file_should_contain /etc/pam.d/sshd pam_google_authenticator.so
+
+  # Can be found on pisces: /home/builduser/rpmbuild/RPMS/x86_64/qrencode-3.1.1-5.x86_64.rpm
+  file_should_exist /usr/lib*/libqrencode.so.3
+
+}
+
+check_mtop() {
+
+  # yum install mtop (from rpmforge)
+  command_should_exist mtop
+  # see https://dokuwiki.helium.selfhost.de/dokuwiki/doku.php/software:mtop
+  file_should_exist /root/.mtoprc
+
+}
+
+check_memcached() {
+
+  # yum install memcached
+  command_should_exist memcached
+
+}
+
+check_sslkeys()
+{
+for KEYFILE in /etc/pki/tls/private/*.key ; do
+	if [ ! -L $KEYFILE ]; then
+	file_needs_permissions $KEYFILE 600
+	fi
+done
+}
+
+check_zsh() {
+
+  # compile manually
+  package_should_exist zsh
+
+  # add manually to /etc/shells
+  file_should_contain /etc/shells /package/host/localhost/zsh
+
+}
+
+check_erlang() {
+
+  # old Erlang from distro
+  file_should_exist /usr/bin/erl
+
+  # new Erlang compiled from source
+  package_should_exist erlang
+  package_should_exist erlang-R15
+  symlink_should_exist /usr/local/bin/erl
+
+}
+
+check_lua() {
+
+  # old Lua from distro
+  file_should_exist /usr/bin/lua
+
+  # new Lua compiled from source
+  package_should_exist lua
+  package_should_exist lua-5.2
+  # don't check symlink yet
+  #symlink_should_exist /usr/local/bin/lua
+
+}
+
+check_healthcheck() {
+
+  service_should_exist uberspace-account-healthcheck
+
+  # mutt configuration file to set realname/charset
+  file_should_exist /root/.muttrc
+
+  # HOME needs to be set manually so that mutt can find it's configuration
+  file_should_contain /service/uberspace-account-healthcheck/run HOME=/root
+}
+
+check_gnutls() {
+
+  # nettle from source
+  # https://dokuwiki.lyra.uberspace.de/dokuwiki/doku.php/software:nettle
+  package_should_exist nettle
+
+  # p11-kit from source
+  # https://dokuwiki.lyra.uberspace.de/dokuwiki/doku.php/software:p11-kit
+  package_should_exist p11-kit
+
+  # gnutls from source
+  # https://dokuwiki.lyra.uberspace.de/dokuwiki/doku.php/software:gnutls
+  package_should_exist gnutls
+}
+
+check_weechat() {
+
+  # weechat from source
+  # https://dokuwiki.lyra.uberspace.de/dokuwiki/doku.php/software:weechat
+  package_should_exist weechat
+
+  # symlink to /package 
+  command_should_exist weechat-curses
+}
+
+check_zmodem() {
+  command_should_exist zssh
+  command_should_exist sz
+  command_should_exist rz
+}
+
+check_forkbomb() {
+
+  # forkbomb protection for shells and cronjobs
+  file_should_contain /etc/security/limits.conf "^\* hard nproc"
+
+  # forkbomb protection for processes running under apache
+  file_should_contain /service/httpd/run ulimit
+
+  # forkbomb protection for processes running under svscan
+  SVSCANUSERS=/service/svscan-*/run
+  if [ "${SVSCANUSERS}" != "" ] ; then
+  for SVSCANUSER in ${SVSCANUSERS} ; do
+    file_should_contain ${SVSCANUSER} ulimit
+  done
+  fi
+}
+
+## main program
+
+if [ "$*" = "" ] ; then
+  TESTLIST=`declare -F | awk '{ print $3 }' | grep '^check_' | sed 's/^check_//'`
+elif [ "$*" = "nagios" ]; then
+	TESTLIST=`declare -F | awk '{ print $3 }' | grep '^check_' | sed 's/^check_//'`;
+	for TEST in $TESTLIST ; do
+		check_$TEST > /dev/null;
+	done
+	if [ "$FAILED" = "0" ]; then
+		echo "OK - no checks failed, $PASSED checks passed";
+		exit 0;
+	else
+		echo "WARNING - $FAILED checks failed, $PASSED check passed";
+		exit 1;
+	fi
+else
+  TESTLIST=$*
+fi
+
+for TEST in $TESTLIST ; do
+  echo "* $TEST"
+  check_$TEST
+done
+
+echo
+echo "passed $PASSED, failed $FAILED"

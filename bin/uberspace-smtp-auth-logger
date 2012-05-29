@@ -1,0 +1,9 @@
+#!/bin/sh
+umask 0077
+if [ "$VUSER" = "" ] ; then
+  echo $TCPREMOTEIP > $HOME/Maildir/last_smtp
+  echo "$USER from $TCPREMOTEIP" | logger -p mail.notice -t smtp-$TCPLOCALPORT
+else
+  echo $TCPREMOTEIP > $HOME/$MAILDIR/last_smtp
+  echo "$USER-$VUSER from $TCPREMOTEIP" | logger -p mail.notice -t smtp-$TCPLOCALPORT
+fi

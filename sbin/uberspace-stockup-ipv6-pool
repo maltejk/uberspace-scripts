@@ -1,0 +1,201 @@
+#!/bin/sh
+########################################################################
+#
+# 2011-04-06
+# Christopher Hirschmann
+# c.hirschmann@jonaspasche.com
+#
+########################################################################
+#
+#       This program is free software: you can redistribute it and/or modify
+#       it under the terms of the GNU General Public License as published by
+#       the Free Software Foundation, either version 3 of the License, or
+#       (at your option) any later version.
+#
+#       This program is distributed in the hope that it will be useful,
+#       but WITHOUT ANY WARRANTY; without even the implied warranty of
+#       MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#       GNU General Public License for more details.
+#
+#       You should have received a copy of the GNU General Public License
+#       along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+########################################################################
+#
+# This script will add new IPv6 addresses to a given interface. It takes
+# a prefix with the last block missing, an address to start from and an
+# address to end with as arguments.
+# The new IPv6 addresses will be added to the address pool index file in
+# /etc/ipv6-address-pool/index.txt, a different index file may be
+# specified.
+#
+# This script performs a lot of tests to ensure it does no damage, but
+# YOU SHOULD DOUBLECHECK, since it is still far from perfection.
+#
+########################################################################
+
+function cantcreate ()
+{
+	echo "Error. Couldn't create $POOLFILE";
+	exit 126;
+}
+
+POOLFILE="/etc/ipv6-address-pool/index.txt";
+USAGE="Usage:\n-h\t\tthis help message\n-d ethX\t\tnetwork device\n-f int\t\taddress to start from (1..65534)\n-i file\t\tindex file containing IPv6 address pool index, default: $POOLFILE\n-p 2a02::1234\t\tIPv6 address prefix with last block missing\n-t int\t\taddress to end with (1..65534)\n";
+
+if [ ! $# -ge 1 ];
+then
+	printf "No arguments given.\n$USAGE" $(basename $0) >&2
+	exit 2;
+fi
+
+## Parse arguments
+while getopts ":hd:f:i:p:t:" Option; do
+	case $Option in
+		h)
+			printf "$USAGE" $(basename $0);
+			exit 0;
+			;;
+		d)
+			INTERFACE=${OPTARG};
+			CONFIGFILE="/etc/sysconfig/network-scripts/ifcfg-${INTERFACE}";
+			;;
+		f)
+			declare -i COUNTFROM=${OPTARG};
+			;;
+		i)
+			POOLFILE=${OPTARG};
+			;;
+		p)
+			PREFIX=${OPTARG};
+			;;
+		t)
+			declare -i COUNTTO=${OPTARG};
+			;;
+		?)
+			printf "Invalid option or option without parameter: -${OPTARG}\n$USAGE" $(basename $0) >&2
+			exit 2;
+			;;
+		*)	# Default.
+			printf "Unimplemented option: -${OPTARG}\n$USAGE" $(basename $0) >&2
+			exit 2;
+			;;
+	esac
+done
+
+shift $(($OPTIND - 1))
+
+if [ -z $INTERFACE ]; then
+	echo "Error. No interface given.";
+	exit 1;
+fi
+
+if [ -z $COUNTFROM ]; then
+	echo "Error. No address to start from given.";
+	exit 1;
+fi
+
+if [ -z $COUNTTO ]; then
+	echo "Error. No address to end with given.";
+	exit 1;
+fi
+
+if [ -z $PREFIX ]; then
+	echo "Error. No prefix given.";
+	exit 1;
+fi
+
+# check if we are running as root
+if [ "`/usr/bin/id -u`" != "0" ] ; then
+	echo "Error. Not running as root.";
+	exit 127;
+fi
+
+if [ $COUNTFROM -ge 65535 ]; then
+	echo "Error. Address to start from must be in 1..65535 (is ${COUNTFROM})."
+	exit 1;
+fi
+
+if [ $COUNTFROM -le 0 ]; then
+	echo "Error. Address to start from must be in 1..65535 (is ${COUNTFROM})."
+	exit 1;
+fi
+
+if [ $COUNTTO -ge 65535 ]; then
+	echo "Error. Address to end with must be in 1..65535 (is ${COUNTTO})."
+	exit 1;
+fi
+
+if [ $COUNTTO -le 0 ]; then
+	echo "Error. Address to end with must be in 1..65535 (is ${COUNTTO})."
+	exit 1;
+fi
+
+if [ $COUNTFROM -gt $COUNTTO  ]; then
+	echo "Error. ${COUNTFROM} is greater than ${COUNTTO}, must be lower or equal.";
+	exit 1;
+fi
+
+# check if the config file is writeable
+if [[ ! -w $CONFIGFILE ]]; then
+	echo "Error. $CONFIGFILE isn't writable."
+	exit 124;
+fi
+
+# if there is no IPV6ADDR_SECONDARIES= option in the config file, add it now
+grep -q "IPV6ADDR_SECONDARIES=" ${CONFIGFILE};
+CONFIGNOTREADY=$?;
+if [ "$CONFIGNOTREADY" == "1" ]; then
+	echo "There is no IPV6ADDR_SECONDARIES option in ${CONFIGFILE}, I'm going to add it.";
+	echo "IPV6ADDR_SECONDARIES=\"\"" >> $CONFIGFILE || exit 123;
+fi
+
+# check if the IPv6 address pool index file exists, create it if it doesn't.
+if [[ ! -a $POOLFILE ]]; then
+	echo "$POOLFILE doesn't exist yet. I'm going to create it."
+	touch $POOLFILE || cantcreate;
+fi
+
+# check if the poolfile is writeable
+if [[ ! -w $POOLFILE ]]; then
+	echo "Error. $POOLFILE isn't writable."
+	exit 125;
+fi
+
+# generate address
+	while (($COUNTFROM <= $COUNTTO)) ; do
+		H=$(printf "%X\n" $COUNTFROM);
+		CURRENTIP=`echo "${PREFIX}:${H}" | tr "[:upper:]" "[:lower:]"`;
+
+# make shure that the address isn't already in the poolfile
+		grep -q "${CURRENTIP} " $POOLFILE;
+		INPOOL=$?;
+		if [ "$INPOOL" == "1" ]; then
+
+# make shure the address isn't already in the interface config
+			grep -q "${CURRENTIP}" $CONFIGFILE;
+			INCONFIG=$?;
+			if [ "$INCONFIG" == "1" ]; then
+		
+# add address to config
+				sed -i -e 's/IPV6ADDR_SECONDARIES=\"/&'"${CURRENTIP}"' /' $CONFIGFILE;
+# add address to interface
+#				echo "ip -6 addr add ${CURRENTIP}/64 dev ${INTERFACE}";
+				ip -6 addr add ${CURRENTIP}/64 dev ${INTERFACE};
+# add address to pool
+				echo "$CURRENTIP free" >> $POOLFILE;
+				((SUCCESSFUL=SUCCESSFUL+1));
+			else
+				echo "Not adding ${CURRENTIP}, because it is already in ${CONFIGFILE}.";
+			fi
+		else
+			echo "Not adding ${CURRENTIP}, because is is already in ${POOLFILE}."
+		fi
+		((COUNTFROM=COUNTFROM+1));
+	done
+
+if [ $SUCCESSFUL ]; then
+	echo "Added $SUCCESSFUL IPv6 addresses.";
+else
+	echo "Added NO IPv6 addresses. :-( Sorry."
+fi

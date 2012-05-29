@@ -1,0 +1,99 @@
+#!/bin/sh
+########################################################################
+#
+# 2012-02-01
+# Andreas Beintken
+# abeintken@jonaspasche.com
+#
+########################################################################
+#
+#	This program is free software: you can redistribute it and/or modify
+#	it under the terms of the GNU General Public License as published by
+#	the Free Software Foundation, either version 3 of the License, or
+#	(at your option) any later version.
+#
+#	This program is distributed in the hope that it will be useful,
+#	but WITHOUT ANY WARRANTY; without even the implied warranty of
+#	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#	GNU General Public License for more details.
+#
+#	You should have received a copy of the GNU General Public License
+#	along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+########################################################################
+#
+# This script helps uberspace-add-domain with the parts that need root privs.
+#
+########################################################################
+
+if [ "${SUDO_USER}" = "" ] ; then
+  exec sudo -n $0 $@
+fi
+
+source /usr/local/sbin/uberspace-account-common
+checkforrootprivs;
+
+## this includes host specific variables
+. /usr/local/sbin/uberspace-account-local-settings.sh;
+
+# confirm that there aren't any bad characters in the username
+echo ${SUDO_USER} | grep -q -E '^[a-z][a-z0-9]{0,7}$'
+if [ "$?" != "0" ] ; then
+  echo "SUDO_USER does not contain a valid username"
+  exit 2
+fi
+
+USAGE="Usage:\n-h\t\tthis help message\n-m\t\tlist domains in qmail-config (mailserver)\n-w\t\tlist domains in apache-config (webserver)\n";
+
+if [ ! $# -ge 1 ];
+then
+  printf "No arguments given.\n$USAGE" $(basename $0) >&2
+  exit 2;
+fi
+
+## Parse arguments
+while getopts ":hmw" Option; do
+        case $Option in
+                h       )
+                                printf "$USAGE" $(basename $0);
+                                exit 0;
+                        ;;
+                m       )
+                                MAILSERVERCONFIG=1;
+                        ;;
+                w       )
+                                WEBSERVERCONFIG=1;
+                        ;;
+                ?       )
+                                printf "Invalid option or option without parameter: -${OPTARG}\n$USAGE" $(basename $0) >&2
+                                exit 2;
+                        ;;
+                *       )       # Default.
+                                printf "Unimplemented option: -${OPTARG}\n$USAGE" $(basename $0) >&2
+                                exit 2;
+                        ;;
+        esac
+done
+
+# check if config is given
+if [[ $MAILSERVERCONFIG -ne 1 && $WEBSERVERCONFIG -ne 1 ]] ; then
+  printf "No config given.\n$USAGE" $(basename $0)>&2
+  exit 2;
+fi
+
+
+# apache
+if [ $WEBSERVERCONFIG ] ; then
+  DOMAINS=`grep -h ^ServerAlias /etc/httpd/conf.d/*.$SUDO_USER.conf | sed "s/ServerAlias //g;" | sed 's/^[ \t]*//;s/[ \t]*$//' | tr -cs 'a-zA-Z0-9*-.' '[\n*]' | sort | uniq`
+  for DOMAIN in $DOMAINS; do
+    echo $DOMAIN
+  done
+fi
+
+# qmail
+if [ $MAILSERVERCONFIG ] ; then
+  for DOMAIN in `grep -E ":${SUDO_USER}$|:${SUDO_USER}-" /var/qmail/control/virtualdomains | grep -v ^${SUDO_USER}.${HOSTNAME}:${SUDO_USER}` ; do
+    echo ${DOMAIN} | sed "s/:${SUDO_USER}-/ /; s/:${SUDO_USER}//;"
+  done
+fi
+

@@ -1,0 +1,144 @@
+#!/bin/sh
+########################################################################
+#
+# 2011-03-03
+# Jonas Pasche
+# jpasche@jonaspasche.com
+#
+########################################################################
+#
+#	This program is free software: you can redistribute it and/or modify
+#	it under the terms of the GNU General Public License as published by
+#	the Free Software Foundation, either version 3 of the License, or
+#	(at your option) any later version.
+#
+#	This program is distributed in the hope that it will be useful,
+#	but WITHOUT ANY WARRANTY; without even the implied warranty of
+#	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#	GNU General Public License for more details.
+#
+#	You should have received a copy of the GNU General Public License
+#	along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+########################################################################
+#
+# This script sets ups a service in your personal ~/service directory
+#
+########################################################################
+
+usage() {
+  echo "Usage: $0 <servicename> <command> [<args> ...]"
+  echo "for example: $0 mydaemon ~/bin/daemon"
+  exit 1
+}
+
+SERVICENAME=$1
+shift
+
+if [[ ! "$SERVICENAME" =~ "^[a-z]" ]] ; then
+  usage
+fi
+
+TESTCOMMAND=$1
+shift
+
+if [ "$TESTCOMMAND" = "" ] ; then
+  usage
+fi
+
+COMMAND=`which $TESTCOMMAND 2>/dev/null`
+
+if [ "$COMMAND" = "" ] ; then
+  echo "The given command $TESTCOMMAND could not be found"
+  exit 1
+fi
+
+if [ ! -d ~/service ] ; then
+  echo "You don't seem to have a ~/service directory. Did you execute uberspace-setup-svscan before?"
+  exit 2
+fi
+
+for DIR in ~/etc/run-$SERVICENAME ~/service/$SERVICENAME ; do
+  if [ -d $DIR ] ; then
+    echo "The $DIR directory already exists"
+    exit 2
+  fi
+done
+
+if [ ! -x $COMMAND ] ; then
+  echo "Cannot find the command $COMMAND or it isn't executable"
+  exit 3
+fi
+
+echo "Creating the ~/etc/run-$SERVICENAME/run service run script"
+mkdir ~/etc/run-$SERVICENAME
+cat <<__EOF__ > ~/etc/run-$SERVICENAME/run
+#!/bin/sh
+
+# These environment variables are sometimes needed by the running daemons
+export USER=$USER
+export HOME=$HOME
+
+# Include the user-specific profile
+. \$HOME/.bash_profile
+
+# Now let's go!
+exec $COMMAND $@ 2>&1
+__EOF__
+chmod +x ~/etc/run-$SERVICENAME/run
+
+echo "Creating the ~/etc/run-$SERVICENAME/log/run logging run script"
+mkdir ~/etc/run-$SERVICENAME/log
+cat <<__EOF__ > ~/etc/run-$SERVICENAME/log/run
+#!/bin/sh
+exec multilog t ./main
+__EOF__
+chmod +x ~/etc/run-$SERVICENAME/log/run
+
+echo "Symlinking ~/etc/run-$SERVICENAME to ~/service/$SERVICENAME to start the service"
+ln -s ../etc/run-$SERVICENAME ~/service/$SERVICENAME
+
+WAIT=0
+echo -n "Waiting for the service to start ..."
+while [ $WAIT -lt 7 ]; do
+  WAIT=$(($WAIT+1))
+  echo -n " $WAIT"
+  /command/svok ~/service/$SERVICENAME
+  SVOK=$?
+  if [ "$SVOK" = "0" ] ; then
+    break
+  fi
+  sleep 1
+done
+
+if [ "$SVOK" != "0" ] ; then
+  echo " failed :-("
+  echo "We're really sorry; this shouldn't have happened - please contact hallo@uberspace.de for help. Thanks a lot!"
+  exit 4
+fi
+
+echo " started!"
+
+# final information
+echo
+echo "Congratulations - the ~/service/$SERVICENAME service is now ready to use!"
+echo "To control your service you'll need the svc command (hint: svc = service control):"
+echo
+echo "To start the service (hint: u = up):"
+echo "  svc -u ~/service/$SERVICENAME"
+echo "To stop the service (hint: d = down):"
+echo "  svc -d ~/service/$SERVICENAME"
+echo "To reload the service (hint: h = HUP):"
+echo "  svc -h ~/service/$SERVICENAME"
+echo "To restart the service (hint: du = down, up):"
+echo "  svc -du ~/service/$SERVICENAME"
+echo
+echo "To remove the service:"
+echo "  cd ~/service/$SERVICENAME"
+echo "  rm ~/service/$SERVICENAME"
+echo "  svc -dx . log"
+echo "  rm -rf ~/etc/run-$SERVICENAME"
+echo
+echo "More information about controlling daemons can be found here:"
+echo "https://uberspace.de/dokuwiki/system:daemontools#wenn_der_daemon_laeuft"
+echo

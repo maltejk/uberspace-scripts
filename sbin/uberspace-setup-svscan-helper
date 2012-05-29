@@ -1,0 +1,94 @@
+#!/bin/sh
+########################################################################
+#
+# 2011-03-03
+# Jonas Pasche
+# jpasche@jonaspasche.com
+#
+########################################################################
+#
+#	This program is free software: you can redistribute it and/or modify
+#	it under the terms of the GNU General Public License as published by
+#	the Free Software Foundation, either version 3 of the License, or
+#	(at your option) any later version.
+#
+#	This program is distributed in the hope that it will be useful,
+#	but WITHOUT ANY WARRANTY; without even the implied warranty of
+#	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#	GNU General Public License for more details.
+#
+#	You should have received a copy of the GNU General Public License
+#	along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+########################################################################
+#
+# This script helps uberspace-setup-svscan with the parts that need root privs.
+#
+########################################################################
+
+if [ "${SUDO_USER}" = "" ] ; then
+  echo "This script is intended to be run by sudo"
+  exit 1
+fi
+
+# confirm that there aren't any bad characters in the username
+echo ${SUDO_USER} | grep -q -E '^[a-z][a-z0-9]{0,7}$'
+if [ "$?" != "0" ] ; then
+  echo "SUDO_USER does not contain a valid username"
+  exit 2
+fi
+
+# This is the user's ~/service directory ("eval echo" is needed for tilde expansion)
+SERVICE_DIR=`eval echo ~${SUDO_USER}/service`
+
+# We don't write anything into a user's $HOME; the user has to create ~/service himself
+if [ ! -d ${SERVICE_DIR} ] ; then
+  echo "The ${SERVICE_DIR} directory does not exist yet"
+  exit 3
+fi
+
+# Check if we already have some job running here
+for DIR in /service/svscan-${SUDO_USER} /etc/run-svscan-${SUDO_USER} ; do
+  if [ -d $DIR ] ; then
+    echo "The $DIR directory already exists"
+    exit 4
+  fi
+done
+
+echo "Creating the /etc/run-svscan-${SUDO_USER}/run script"
+mkdir /etc/run-svscan-${SUDO_USER}
+cat <<__EOF__ > /etc/run-svscan-${SUDO_USER}/run
+#!/bin/sh
+ulimit -u 300
+exec setuidgid ${SUDO_USER} /command/svscan ${SERVICE_DIR} 2>&1
+__EOF__
+chmod 755 /etc/run-svscan-${SUDO_USER}/run
+
+echo "Symlinking /etc/run-svscan-${SUDO_USER} to /service/svscan-${SUDO_USER} to start the service"
+ln -s /etc/run-svscan-${SUDO_USER} /service/svscan-${SUDO_USER}
+
+WAIT=0
+echo -n "Waiting for the service to start ..."
+while [ $WAIT -lt 7 ]; do
+  WAIT=$(($WAIT+1))
+  echo -n " $WAIT"
+  /command/svok /service/svscan-${SUDO_USER}
+  SVOK=$?
+  if [ "$SVOK" = "0" ] ; then
+    break
+  fi
+  sleep 1
+done
+
+if [ "$SVOK" != "0" ] ; then
+  echo " failed :-("
+  echo "We're really sorry; this shouldn't have happened - please contact hallo@uberspace.de for help. Thanks a lot!"
+  exit 4
+fi
+
+echo " started!"
+
+# final information
+echo
+echo "Congratulations - your personal ~/service directory is now ready to use!"
+echo

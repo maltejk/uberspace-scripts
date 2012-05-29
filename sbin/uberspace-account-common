@@ -1,0 +1,114 @@
+#!/bin/bash
+########################################################################
+#
+# 2010-10-01
+# Christopher Hirschmann
+# c.hirschmann@jonaspasche.com
+#
+########################################################################
+#
+#	This program is free software: you can redistribute it and/or modify
+#	it under the terms of the GNU General Public License as published by
+#	the Free Software Foundation, either version 3 of the License, or
+#	(at your option) any later version.
+#
+#	This program is distributed in the hope that it will be useful,
+#	but WITHOUT ANY WARRANTY; without even the implied warranty of
+#	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#	GNU General Public License for more details.
+#
+#	You should have received a copy of the GNU General Public License
+#	along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+########################################################################
+#
+# This file contains common functions that are used by several scripts that manage
+# uberspace accounts.
+#
+########################################################################
+
+# check for root privileges
+checkforrootprivs ()
+{
+if [ "`/usr/bin/id -u`" != "0" ] ; then
+  echo "Keine root-Rechte vorhanden";
+  exit 1;
+fi
+}
+
+checkusername ()
+{
+if [ "`echo $1 | grep '[^0-9a-z]'`" != "" ] ; then
+  echo "Ungueltige Zeichen im Benutzernamen";
+  exit 1;
+fi
+
+if [ "`echo $1 | grep '^[a-z]'`" != "$1" ] ; then
+  echo "Benutzername beginnt nicht mit einem Buchstaben";
+  exit 1;
+fi
+}
+
+function notinconfig ()
+{
+	echo "Domain \"${DOMAIN}\" not in \"$VHOSTCONF\" or that file was not found. Aborting.";
+	exit 1;
+}
+
+function noconfig ()
+{
+	echo "Could not remove \" $DOMCONF\". Aborting.";
+	exit 1;
+}
+
+function removefromftpusers ()
+{
+grep -e "^${USERNAME}$" /etc/vsftpd/ftpusers;
+ISBLOCKED1=$?;
+if [ "${ISBLOCKED1}" == "1" ]; then
+	echo "User ${USERNAME} is not on FTP blocklist (/etc/vsftpd/ftpusers).";
+elif [ "${ISBLOCKED1}" == "0" ]; then
+	/bin/cp /etc/vsftpd/ftpusers /etc/vsftpd/ftpusers.bak;
+	sed -i -e '/^'"${USERNAME}"'$/d' /etc/vsftpd/ftpusers;
+	echo "Removed User ${USERNAME} from FTP blocklist (/etc/vsftpd/ftpusers).";
+fi
+}
+
+function removefromftpuser_list ()
+{
+grep -e "^${USERNAME}$" /etc/vsftpd/user_list;
+ISBLOCKED2=$?;
+if [ "${ISBLOCKED2}" == "1" ]; then
+	echo "User ${USERNAME} is not on FTP blocklist (/etc/vsftpd/user_list).";
+elif [ "${ISBLOCKED2}" == "0" ]; then
+	/bin/cp /etc/vsftpd/user_list /etc/vsftpd/user_list.bak;
+	sed -i -e '/^'"${USERNAME}"'$/d' /etc/vsftpd/user_list;
+	echo "Removed User ${USERNAME} from FTP blocklist (/etc/vsftpd/user_list).";
+fi
+}
+
+function addtoftpusers ()
+{
+grep -e "^${USERNAME}$" /etc/vsftpd/ftpusers;
+ISBLOCKED1=$?;
+if [ "${ISBLOCKED1}" == "0" ]; then
+	echo "User ${USERNAME} is already on FTP blocklist (/etc/vsftpd/ftpusers).";
+elif [ "${ISBLOCKED1}" == "1" ]; then
+	/bin/cp /etc/vsftpd/ftpusers /etc/vsftpd/ftpusers.bak;
+	echo ${USERNAME} >> /etc/vsftpd/ftpusers;
+	echo "Added User ${USERNAME} to FTP blocklist (/etc/vsftpd/ftpusers).";
+fi
+}
+
+function addtoftpuser_list ()
+{
+grep -e "^${USERNAME}$" /etc/vsftpd/user_list;
+ISBLOCKED2=$?;
+if [ "${ISBLOCKED2}" == "0" ]; then
+	echo "User ${USERNAME} is already on FTP blocklist (/etc/vsftpd/user_list).";
+elif [ "${ISBLOCKED2}" == "1" ]; then
+	/bin/cp /etc/vsftpd/user_list /etc/vsftpd/user_list.bak;
+	echo ${USERNAME} >> /etc/vsftpd/user_list;
+	echo "Added User ${USERNAME} to FTP blocklist (/etc/vsftpd/user_list).";
+fi
+}

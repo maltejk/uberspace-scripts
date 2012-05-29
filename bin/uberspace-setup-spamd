@@ -1,0 +1,119 @@
+#!/bin/sh
+########################################################################
+#
+# 2011-03-03
+# Andreas Beintken
+# abeintken@jonaspasche.com
+#
+########################################################################
+#
+#	This program is free software: you can redistribute it and/or modify
+#	it under the terms of the GNU General Public License as published by
+#	the Free Software Foundation, either version 3 of the License, or
+#	(at your option) any later version.
+#
+#	This program is distributed in the hope that it will be useful,
+#	but WITHOUT ANY WARRANTY; without even the implied warranty of
+#	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#	GNU General Public License for more details.
+#
+#	You should have received a copy of the GNU General Public License
+#	along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+########################################################################
+#
+# This script will setup a spamd for a user. 
+#
+########################################################################
+
+MY_UID=`id -u`
+
+if [ "$MY_UID" = "0" ] ; then
+  echo "This script is not designed to run as root."
+  exit 1
+fi
+
+if [ ! -d ~/service ] ; then
+  echo "You need to have a working ~/service directory first!"
+  echo "This needs to be set up only once; you can use ~/service for a couple of things, not only spamd."
+  echo "To set up ~/service read https://uberspace.de/dokuwiki/system:daemontools or just use our setup-script" 
+  echo " \"uberspace-setup-svscan\" before you run this script again."
+  exit 2
+fi
+
+for DIR in ~/service/spamd ~/etc/run-spamd ; do
+  if [ -d $DIR ] ; then
+    echo "You already have a $DIR directory. Nothing to do here."
+    exit 3
+  fi
+done
+
+# create tmp directory if not exist
+if [ ! -d ~/tmp ]; then
+  echo "Create ~/tmp directory for the spamd socket"
+  mkdir ~/tmp
+fi
+
+# create config directory if not exist
+if [ ! -d ~/.spamassassin ] ; then
+  echo "Create config directory ~/.spamassassin"
+  mkdir ~/.spamassassin
+fi
+
+# create default config
+if [ ! -f ~/.spamassassin/user_prefs ] ; then
+  echo "Create default spamd config ~/.spamassassin/user_prefs"
+cat <<__EOF__ > ~/.spamassassin/user_prefs
+required_hits 5
+report_safe 0
+rewrite_header Subject [SPAM]
+__EOF__
+fi
+
+# create the spamd service run script
+echo "Creating the ~/etc/run-spamd/run service run script"
+mkdir ~/etc/run-spamd
+cat <<__EOF__ > ~/etc/run-spamd/run
+#!/bin/sh
+exec /usr/bin/spamd --local --socketpath=$HOME/tmp/spamd.sock -s stderr 2>&1
+__EOF__
+chmod 755 ~/etc/run-spamd/run
+
+# create the spamd logging run script
+echo "Creating the ~/etc/run-spamd/log/run logging run script"
+mkdir ~/etc/run-spamd/log
+cat <<__EOF__ > ~/etc/run-spamd/log/run
+#!/bin/sh
+exec multilog t ./main
+__EOF__
+chmod 755 ~/etc/run-spamd/log/run
+
+echo "Symlinking ~/etc/run-spamd to ~/service/spamd to start the service"
+ln -s ../etc/run-spamd ~/service/spamd
+
+WAIT=0
+echo -n "Waiting for the service to start ..."
+while [ $WAIT -lt 6 ]; do
+  WAIT=$(($WAIT+1))
+  echo -n " $WAIT"
+  svok ~/service/spamd 2>/dev/null
+  SVOK=$?
+  if [ "$SVOK" = "0" ] ; then
+    break
+  fi
+  sleep 1
+done
+
+if [ "$SVOK" != "0" ] ; then
+  echo " failed :-("
+  echo "We're really sorry; this shouldn't have happened - please contact hallo@uberspace.de for help. Thanks a lot!"
+  exit 4
+fi
+
+echo " started!"
+
+# final information
+echo
+echo "Congratulations - You can now reach your dedicated spamd!"
+echo "To connect to your own spamd you can use spamc with the option \"--socket=$HOME/tmp/spamd.sock\""
+echo

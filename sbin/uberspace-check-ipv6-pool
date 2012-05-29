@@ -1,0 +1,102 @@
+#!/bin/sh
+########################################################################
+#
+# 2010-09-22
+# Christopher Hirschmann
+# c.hirschmann@jonaspasche.com
+#
+########################################################################
+#
+#	This program is free software: you can redistribute it and/or modify
+#	it under the terms of the GNU General Public License as published by
+#	the Free Software Foundation, either version 3 of the License, or
+#	(at your option) any later version.
+#
+#	This program is distributed in the hope that it will be useful,
+#	but WITHOUT ANY WARRANTY; without even the implied warranty of
+#	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#	GNU General Public License for more details.
+#
+#	You should have received a copy of the GNU General Public License
+#	along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+########################################################################
+#
+# This is a nagios plugin to check how many free IPv6 addresses a
+# uberspace host has available.
+# Basically it checks for a specific pattern ('free') in an index file
+# ('/etc/ipv6-address-pool/index.txt').
+# It should not be too dificult to reuse this script to search for
+# other patterns in other files, rudimentary support for that is already
+# implemented. You'd have to change the output though.
+#
+########################################################################
+
+FILE="/etc/ipv6-address-pool/index.txt";
+PATTERN="free";
+
+checkopt ()
+{
+if [[ $1 != [0-9]* ]] ; then
+	echo -e "UNKNOWN - $1 contains invalid character.";
+	exit 3;
+fi
+}
+
+## Parse arguments
+while getopts ":hc:f:p:w:" Option; do
+	case $Option in
+		h	)
+				echo -e "Usage:\n-h\tthis help message\n-c\tcritical warning level\n-w\twarning level";
+				exit 0;
+			;;
+		c	)
+				checkopt ${OPTARG};
+				declare -i CRITICALLEVEL=${OPTARG};
+			;;
+		f	)
+				FILE=${OPTARG};
+			;;
+		p	)
+				PATTERN=${OPTARG};
+			;;
+		w	)
+				checkopt ${OPTARG};
+				declare -i WARNLEVEL=${OPTARG};
+			;;
+		*	)	# Default.
+				echo -e "UNKNOWN - Unimplemented option chosen: -${OPTARG}";
+				exit 3;
+			;;
+	esac
+done
+
+if [ "${CRITICALLEVEL}" = "" ]; then
+    echo -e "UNKNOWN - Error: critical warning level unspecified";
+    exit 3;
+fi
+
+if [ "${WARNLEVEL}" = "" ]; then
+    echo -e "UNKNOWN - Error: warning level unspecified";
+    exit 3;
+fi
+
+
+# count number of IPv6 addresses marked as free:
+declare -i FREEIPS=`grep ${PATTERN} ${FILE} | wc -l`
+
+# compare the number we got with the warning and critical levels that were specified
+if [ ${FREEIPS} -lt $CRITICALLEVEL ]; then
+    echo "CRITICAL - less than $CRITICALLEVEL IPv6 addresses free: $FREEIPS";
+    exit 2;
+elif [ ${FREEIPS} -lt $WARNLEVEL ]; then
+    echo "WARNING - less than $WARNLEVEL IPv6 addresses free: $FREEIPS";
+    exit 1;
+elif [ ${FREEIPS} -ge $WARNLEVEL ]; then
+    echo "OK - $WARNLEVEL or more IPv6 addresses free: $FREEIPS";
+    exit 0;
+fi
+
+# if the script hasn't exited at this point, assume an unkown error
+echo "UNKNOWN - Unknown error";
+exit 3;

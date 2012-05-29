@@ -1,0 +1,133 @@
+#!/bin/sh
+########################################################################
+#
+# 2011-10-11
+# Jonas Pasche
+# jpasche@jonaspasche.com
+#
+########################################################################
+#
+#       This program is free software: you can redistribute it and/or modify
+#       it under the terms of the GNU General Public License as published by
+#       the Free Software Foundation, either version 3 of the License, or
+#       (at your option) any later version.
+#
+#       This program is distributed in the hope that it will be useful,
+#       but WITHOUT ANY WARRANTY; without even the implied warranty of
+#       MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#       GNU General Public License for more details.
+#
+#       You should have received a copy of the GNU General Public License
+#       along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+########################################################################
+#
+# This script will provide some account information, mainly to provide that
+# information within the Uberspace.de dashboard.
+
+source  /usr/local/sbin/uberspace-account-common
+
+checkforrootprivs;
+
+USAGE="Usage:\n-h\t\tthis help message\n-u string\tusername (mandatory)\n-d\t\toptimize for dashboard, run only selected checks\n";
+
+if [ ! $# -ge 1 ];
+then
+	printf "No arguments given.\n$USAGE" $(basename $0) >&2
+	exit 2;
+fi
+
+## Parse arguments
+while getopts ":hdu:" Option; do
+	case $Option in
+		h	)
+				printf "$USAGE" $(basename $0);
+				exit 0;
+			;;
+		d	)
+				OPTIMIZE_FOR_DASHBOARD=1;
+			;;
+		u	)
+				checkusername ${OPTARG}
+				USERNAMEGIVEN=1;
+				USERNAME=${OPTARG};
+			;;
+		?	)
+				printf "Invalid option or option without parameter: -${OPTARG}\n$USAGE" $(basename $0) >&2
+				exit 2;
+			;;
+		*	)	# Default.
+				printf "Unimplemented option: -${OPTARG}\n$USAGE" $(basename $0) >&2
+				exit 2;
+			;;
+	esac
+done
+
+shift $(($OPTIND - 1))
+
+if [ ! "$USERNAMEGIVEN" ];
+then
+	printf "No username given.\n$USAGE" $(basename $0) >&2
+	exit 2;
+fi
+
+if [ ! -f /etc/httpd/conf.d/virtual.${USERNAME}.conf ] ; then
+  echo "ERROR: not a uberspace user"
+  exit 3;
+fi
+
+# higher portability if the user does not reside in /home
+USERHOME=`eval echo ~${USERNAME}`
+
+echo domain_count `grep ^ServerAlias /etc/httpd/conf.d/virtual.${USERNAME}.conf | wc -l`
+
+if [ -e /var/www/virtual/${USERNAME}/logs/access_log ] ; then
+  echo access_log_size `stat --printf=%s /var/www/virtual/${USERNAME}/logs/access_log`
+fi
+
+echo running_services `/command/svstat ${USERHOME}/service/* | grep " up " | wc -l`
+
+if [ ! "$OPTIMIZE_FOR_DASHBOARD" ] ; then
+  echo recent_files_in_vwv `find /var/www/virtual/${USERNAME} -mtime -30 | grep -v logs | wc -l`
+  echo recent_files_in_home `find ${USERHOME} -mtime -30 | wc -l`
+  echo recent_files_in_mysql `find /var/lib/mysql/${USERNAME} -mtime -30 | wc -l`
+fi
+
+RECEIVES_PRIMARYMAIL=0
+if [ -e ${USERHOME}/.qmail ] ; then
+  echo forwards_primary_address 1
+  RECEIVES_PRIMARYMAIL=1
+fi
+
+for LASTFILE in last_imap last_pop3 ; do
+  if [ -e ${USERHOME}/Maildir/${LASTFILE} ] ; then
+    echo has_primarymail_${LASTFILE} 1
+    RECENT=`find ${USERHOME}/Maildir/${LASTFILE} -mtime -14 | wc -l`
+    echo primarymail_${LASTFILE}_recent ${RECENT}
+    if [ "${RECENT}" = "1" ] ; then
+      RECEIVES_PRIMARYMAIL=1
+    fi
+  fi
+done
+
+echo receives_primarymail ${RECEIVES_PRIMARYMAIL}
+
+if [ -d ${USERHOME}/Maildir/new ] ; then
+  echo unread_messages `find ${USERHOME}/Maildir/new/ -type f | wc -l`
+else
+  echo unread_messages 0
+fi
+
+QUOTA=`quota -g ${USERNAME} 2>&1 | grep /dev`
+echo quota `echo $QUOTA | awk '{ print $3 }'`
+echo blocks `echo $QUOTA | awk '{ print $2 }'`
+
+PWHASH=`grep ^${USERNAME}: /etc/shadow | awk -F : '{ print $2 }'`
+if [ "$PWHASH" = "!!" ] ; then
+  echo has_password 0
+else
+  echo has_password 1
+  echo hash_length ${#PWHASH}
+fi
+
+echo has_authorized_keys `grep -v -E " Uberspace\.de\$" ${USERHOME}/.ssh/authorized_keys | wc -l`

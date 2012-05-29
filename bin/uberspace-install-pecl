@@ -1,0 +1,122 @@
+#!/bin/sh
+########################################################################
+#
+# 2011-09-26
+# Jonas Pasche
+# jpasche@jonaspasche.com
+#
+########################################################################
+#
+#       This program is free software: you can redistribute it and/or modify
+#       it under the terms of the GNU General Public License as published by
+#       the Free Software Foundation, either version 3 of the License, or
+#       (at your option) any later version.
+#
+#       This program is distributed in the hope that it will be useful,
+#       but WITHOUT ANY WARRANTY; without even the implied warranty of
+#       MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#       GNU General Public License for more details.
+#
+#       You should have received a copy of the GNU General Public License
+#       along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+########################################################################
+#
+# This script tries to install a given PECL module from pecl.php.net
+# into a user's home directory. It automatically adapts his local php.ini
+# to include the freshly compiled module.
+#
+########################################################################
+
+usage() {
+  echo "Usage: $0 <pecl-module-name>"
+  echo "for example: $0 apc"
+  exit 1
+}
+
+error() {
+  echo "Error: $1 - please contact hallo@uberspace.de for help!"
+  if [[ "$BUILD_DIR" != "" && -d $BUILD_DIR ]] ; then
+    echo "We have left the build directory $BUILD_DIR in place."
+  fi
+  exit 1
+}
+
+PECL_NAME=$1
+if [ "$PECL_NAME" = "" ] ; then
+  usage
+fi
+
+echo -n "Creating build directory ... "
+BUILD_DIR=`mktemp -d` || error "Creating build directory failed"
+echo "done: $BUILD_DIR"
+cd $BUILD_DIR
+
+echo "Downloading PECL module ... "
+pecl download ${PECL_NAME}
+# in case of 'channel "..." has updated its protocols' there's also a channel.xml which we need to ignore
+PECL_FILENAME=`find . -type f | grep -v channel.xml | head -1`
+if [[ "$PECL_FILENAME" = "" || ! -f $PECL_FILENAME ]] ; then
+  error "Download failed"
+fi
+
+echo -n "Extracting $PECL_FILENAME ... "
+tar -xzf $PECL_FILENAME
+PECL_DIR=`find . -mindepth 1 -maxdepth 1 -type d | head -1`
+if [ -d $PECL_DIR ] ; then
+  echo "done: extracted to $PECL_DIR"
+else
+  error "Extraction failed"
+fi
+
+cd $PECL_DIR
+phpize      || error "phpize failed"
+./configure || error "./configure failed"
+make        || error "make failed"
+
+if [ ! -f ~/etc/php.ini ] ; then
+  PHPLIBDIR=`php --ini | head -1 | awk -F ": " '{ print $2 }'`
+  echo -n "Copying $PHPLIBDIR/php.ini to ~/etc ... "
+  cp -a $PHPLIBDIR/php.ini ~/etc/ || error "Copying $PHPLIBDIR/php.ini failed"
+  echo "done"
+fi
+
+EXT_DIR=`grep ^extension_dir ~/etc/php.ini | sed 's/.*= *//' | sed 's/"//g'`
+
+# case: "unconfigured extension_dir"
+if [ "$EXT_DIR" = "" ] ; then
+  EXT_DIR=$HOME/pecl
+  echo -n "Configuring your extension_dir to $EXT_DIR ... "
+  echo "extension_dir = $EXT_DIR" >> ~/etc/php.ini
+  echo "done"
+fi
+
+# case: "bloody configured extension_dir"
+if [ "$EXT_DIR" = "./" ] ; then
+  EXT_DIR=$HOME/pecl
+  echo -n "Changing your extension_dir to $EXT_DIR ... "
+  perl -pi -e "s|^extension_dir.*|extension_dir = $EXT_DIR|" ~/etc/php.ini
+  echo "done"
+fi
+
+if [ ! -d $EXT_DIR ] ; then
+  echo -n "Creating $EXT_DIR ... "
+  mkdir -p $EXT_DIR || error "Creating $EXT_DIR failed"
+  echo "done"
+fi
+
+cd modules
+MODULES=`ls *.so`
+echo -n "Installing $MODULES to $EXT_DIR ... "
+cp -a $MODULES $EXT_DIR || error "Installing $MODULES to $EXT_DIR failed"
+echo "done"
+
+for MODULE in $MODULES ; do
+  echo -n "Activating $MODULE in ~/etc/php.ini ... "
+  echo "extension=$MODULE" >> ~/etc/php.ini
+  echo "done"
+done
+
+echo -n "Killing currently running PHP processes (if any) ... "
+killall --quiet -u $USER php-cgi
+echo "done"

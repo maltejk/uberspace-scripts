@@ -1,0 +1,127 @@
+#!/bin/sh
+########################################################################
+#
+# 2011-03-03
+# Jonas Pasche
+# jpasche@jonaspasche.com
+#
+########################################################################
+#
+#	This program is free software: you can redistribute it and/or modify
+#	it under the terms of the GNU General Public License as published by
+#	the Free Software Foundation, either version 3 of the License, or
+#	(at your option) any later version.
+#
+#	This program is distributed in the hope that it will be useful,
+#	but WITHOUT ANY WARRANTY; without even the implied warranty of
+#	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#	GNU General Public License for more details.
+#
+#	You should have received a copy of the GNU General Public License
+#	along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+########################################################################
+#
+# This script will setup a MongoDB installation for a user
+#
+########################################################################
+
+MY_UID=`id -u`
+
+if [ "$MY_UID" = "0" ] ; then
+  echo "This script is not designed to run as root."
+  exit 1
+fi
+
+if [ ! -d ~/service ] ; then
+  echo "You need to have a working ~/service directory first to run your own daemons."
+  echo "Please run \"uberspace-setup-svscan\" to initialize it before setting up MongoDB."
+  exit 2
+fi
+
+for DIR in ~/mongodb ~/service/mongodb ~/etc/run-mongodb ; do
+  if [ -d $DIR ] ; then
+    echo "You already have a $DIR directory. Nothing to do here."
+    exit 3
+  fi
+done
+
+# create the database directory
+echo "Creating the ~/mongodb database directory"
+mkdir ~/mongodb
+
+# choose a unique (!) port number
+MONGODB_PORT=$((20000 + $MY_UID))
+MONGODB_USER="`id -un`_mongoadmin"
+MONGODB_PASS=`apg -n 1`
+
+# create the mongo service run script
+echo "Creating the ~/etc/run-mongodb/run service run script"
+mkdir ~/etc/run-mongodb
+cat <<__EOF__ > ~/etc/run-mongodb/run
+#!/bin/sh
+exec mongod --dbpath ~/mongodb --bind_ip 127.0.0.1 --port $MONGODB_PORT --auth --nohttpinterface 2>&1
+__EOF__
+chmod 755 ~/etc/run-mongodb/run
+
+# create the mongo logging run script
+echo "Creating the ~/etc/run-mongodb/log/run logging run script"
+mkdir ~/etc/run-mongodb/log
+cat <<__EOF__ > ~/etc/run-mongodb/log/run
+#!/bin/sh
+exec multilog t ./main
+__EOF__
+chmod 755 ~/etc/run-mongodb/log/run
+
+echo "Symlinking ~/etc/run-mongodb to ~/service/mongodb to start the service"
+ln -s ../etc/run-mongodb ~/service/mongodb
+
+WAIT=0
+echo -n "Waiting for the service to start ..."
+while [ $WAIT -lt 6 ]; do
+  WAIT=$(($WAIT+1))
+  echo -n " $WAIT"
+  svok ~/service/mongodb 2>/dev/null
+  SVOK=$?
+  if [ "$SVOK" = "0" ] ; then
+    break
+  fi
+  sleep 1
+done
+
+if [ "$SVOK" != "0" ] ; then
+  echo " failed :-("
+  echo "We're really sorry; this shouldn't have happened - please contact hallo@uberspace.de for help. Thanks a lot!"
+  exit 4
+fi
+
+echo " started!"
+
+# Creating the administrative user
+echo "Creating administrative user"
+# mongod needs a small moment to start
+sleep 1
+cat <<__EOF__ > ~/mongodb/setup.js
+db.addUser("$MONGODB_USER", "$MONGODB_PASS")
+__EOF__
+mongo --port $MONGODB_PORT admin ~/mongodb/setup.js 1>/dev/null
+
+if [ ! -e ~/mongodb/admin.ns ] ; then
+  echo "Something failed - administrative user NOT created; I left ~/mongodb/setup.js in place."
+  echo "Please contact hallo@uberspace.de for help!"
+  exit 5
+fi
+
+rm -f ~/mongodb/setup.js
+
+# final information
+echo
+echo "Congratulations - You can now reach your dedicated MongoDB installation!"
+echo "Please note that your MongoDB uses the NON-standard port number $MONGODB_PORT."
+echo "This allows running multiple instances of MongoDB on the same machine for different users."
+echo
+echo "Hostname: localhost"
+echo "Portnum#: $MONGODB_PORT"
+echo "Username: $MONGODB_USER"
+echo "Password: $MONGODB_PASS"
+echo

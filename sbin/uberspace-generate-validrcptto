@@ -1,0 +1,234 @@
+#!/usr/bin/env perl
+########################################################################
+#
+# 2011-02-07
+# Jonas Pasche
+# jpasche@jonaspasche.com
+#
+########################################################################
+#
+#       This program is free software: you can redistribute it and/or modify
+#       it under the terms of the GNU General Public License as published by
+#       the Free Software Foundation, either version 3 of the License, or
+#       (at your option) any later version.
+#
+#       This program is distributed in the hope that it will be useful,
+#       but WITHOUT ANY WARRANTY; without even the implied warranty of
+#       MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#       GNU General Public License for more details.
+#
+#       You should have received a copy of the GNU General Public License
+#       along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+########################################################################
+#
+# Purpose of this script is to create a validrcptto.cdb file for use with
+# qmail/netqmail to allow filtering incoming mail for valid recipients in
+# combination with the validrcptto.cdb patch:
+#
+# http://qmail.jms1.net/patches/validrcptto.cdb.shtml
+#
+# It follows quite a lot of the logic of qmail-smtpd and qmail-send:
+#
+# - For domains in control/locals, it takes users both from ~alias and
+#   from /etc/passwd into account
+# - It handles .qmail-extension files of users
+# - It handles .qmail-default catchall addresses and is able to identify
+#   if a vmailmgr vdeliver call is contained within it
+# - It parses vmailmgr passwd.cdb files and does correct '+' catchalls
+# - It supports virtual domains in control/virtualdomains, especially
+#   extension namespaces like "domain.tld:user-ext" which takes all
+#   matching ~user/.qmail-ext-* files into account (again, with correct
+#   catchall handling)
+#
+# The script assumes the qmail installation to reside in /var/qmail. If
+# it is installed elsewhere you can call it with "-h /some/where/else".
+
+use strict;
+use warnings;
+
+use Getopt::Std;
+use File::Slurp;
+use CDB_File;
+
+# read options
+my %opts;
+getopt('h', \%opts);
+
+# where is our qmail installation?
+my $qmail_home = $opts{'h'} || '/var/qmail';
+
+# first read a list of all system users and collect their .qmail and vmailmgr addresses
+my %systemusers;
+open (P, '/etc/passwd');
+while (<P>) {
+  chomp;
+  my @passwd = split(/:/, $_);
+
+  # qmail never delivers mail to root, so let's ignore him
+  # (if a ~alias/.qmail-root exists, it's taken into account later!)
+  next if $passwd[0] eq 'root';
+
+  # retrieve the list of all .qmail-files within the user's home directory
+  $systemusers{$passwd[0]}{dotqmail} = { get_dotqmail($passwd[5]) };
+
+  # if there isn't a .qmail-default, there can't be a functional vmailmgr setup; let's stop here
+  next unless $systemusers{$passwd[0]}{dotqmail}{'default'};
+
+  # if there is a .qmail-default without a call to 'vdeliver' in it, it's a catchall; let's stop here
+  unless ( read_file($passwd[5] . '/.qmail-default') =~ /^\|\/usr\/bin\/vdeliver/ ) {
+    $systemusers{$passwd[0]}{catchall} = 1;
+    next;
+  }
+
+  # as .qmail-default contains a call to vdeliver, it isn't a regular catch-all, so delete it from the list
+  delete $systemusers{$passwd[0]}{dotqmail}{'default'};
+
+  # look if there is a vmailmgr password file
+  my $passwd_cdb = $passwd[5] . '/passwd.cdb';
+  next unless -f $passwd_cdb;
+
+  # retrieve the userlist of that file
+  my %passwd_cdb;
+  tie %passwd_cdb, 'CDB_File', $passwd_cdb;
+  $systemusers{$passwd[0]}{vmailmgr} = { map { $_ => 1 } keys %passwd_cdb };
+  untie %passwd_cdb;
+
+  # if there is a vmailmgr user names '+' we're having a catchall here
+  if ($systemusers{$passwd[0]}{vmailmgr}{'+'}) {
+    $systemusers{$passwd[0]}{catchall} = 1;
+  }
+
+}
+close (P);
+
+# now start creating the validrcptto.cdb file step by step
+my $validrcptto_cdb = "$qmail_home/control/validrcptto.cdb";
+my $validrcptto_tmp = "$qmail_home/control/validrcptto.tmp.$$";
+
+my $cdb = new CDB_File($validrcptto_cdb, $validrcptto_tmp)
+  or die "creating $validrcptto_tmp failed: $!";
+
+# first, handle domains in control/locals (all system users and global aliases)
+my %aliases = get_dotqmail("$qmail_home/alias");
+open (LOCALS, "$qmail_home/control/locals");
+while (<LOCALS>) {
+  chomp;
+  my $localdomain = $_;
+
+  # add global aliases as valid recipients
+  foreach my $alias (sort keys %aliases) {
+    add_valid_rcpt($alias . '@' . $localdomain);
+  }
+
+  # add system users as valid recipients
+  foreach my $systemuser (sort keys %systemusers) {
+    # the system user itself is alway valid
+    # => systemuser@[localdomain]
+    add_valid_rcpt($systemuser . '@' . $localdomain);
+    if ($systemusers{$systemuser}{catchall}) {
+      # this is a catchall extension; we can ignore every other address then, as they're all valid
+      # systemuser-default@[localdomain]
+      add_valid_rcpt($systemuser . '-default@' . $localdomain);
+    } else {
+      # add every .qmail address as well as every vmailmgr address
+      # systemuser-something@[localdomain]
+      foreach ((keys %{$systemusers{$systemuser}{dotqmail}}), (keys %{$systemusers{$systemuser}{vmailmgr}})) {
+        add_valid_rcpt($systemuser . '-' . $_ . '@' . $localdomain);
+      }
+    }
+  }
+
+}
+close (LOCALS);
+
+# second, handle domains in control/virtualdomains
+open (VD, "$qmail_home/control/virtualdomains");
+while (<VD>) {
+  chomp;
+
+  # ignore empty and commented lines
+  next unless ($_ =~ /^[^#]+/);
+
+  my ($virtualdomain, $systemuser) = split(/:/, $_);
+
+  if( $systemuser =~ /^([^-]+)-(.*)$/ ) {
+
+    # this is a special mapping of a virtual domain to an extension namespace
+    $systemuser = $1;
+    my $extension = $2;
+    if ($systemusers{$systemuser}{dotqmail}{$extension . '-default'}) {
+      # this extension namespace has a catchall (~systemuser/.qmail-ext-default),
+      # thus all addresses under that domain are valid
+      # (namespace extensions can't contain a vdeliver call)
+      add_valid_rcpt('@' . $virtualdomain);
+    } else {
+      # this extension namespace does not have a catchall,
+      # so let's apply the range of matching .qmail and vmailmgr addresses
+      # ~systemuser/.qmail-ext-something => something@[virtualdomain]
+      foreach ((keys %{$systemusers{$systemuser}{dotqmail}}), (keys %{$systemusers{$systemuser}{vmailmgr}})) {
+        if( /^$extension-(.*)$/ ) {
+          add_valid_rcpt($1 . '@' . $virtualdomain);
+        }
+      }
+    }
+
+  } else {
+    
+    # this is a regular mapping of a virtual domain to a system user
+    if ($systemusers{$systemuser}{catchall}) {
+      # the system user has a .qmail-default file without a vdeliver call,
+      # so let's add a catchall and ignore all other addresses as they're all valid
+      add_valid_rcpt('@' . $virtualdomain);
+    } else {
+      # add every .qmail address as well as every vmailmgr address
+      # => something@[virtualdomain]
+      foreach ((keys %{$systemusers{$systemuser}{dotqmail}}), (keys %{$systemusers{$systemuser}{vmailmgr}})) {
+        add_valid_rcpt($_ . '@' . $virtualdomain);
+      }
+    }
+
+  }
+
+}
+close (VD);
+
+$cdb->finish
+  or die "finishing $validrcptto_cdb failed: $!";
+
+# conservative permissions
+system("chown qmaild $validrcptto_cdb");
+system("chmod 600 $validrcptto_cdb");
+
+=head2 add_valid_rcpt($rcpt)
+
+Adds the given recipient to the list of valid recipients
+
+=cut
+
+sub add_valid_rcpt {
+  my ($rcpt) = @_;
+  #print STDERR $rcpt . "\n";
+  $cdb->insert($rcpt, 1);
+}
+
+
+=head2 get_dotqmail($dir)
+
+Returns a hash (address => 1) of addresses based on .qmail files in the given directory
+
+=cut
+
+sub get_dotqmail {
+  my ($dir) = @_;
+  opendir (D, $dir);
+  my %dotqmail = map {
+    $_ =~ s/^\.qmail-//;
+    $_ =~ s/:/./g;
+    $_ => 1;
+  } grep {
+    /^\.qmail-/
+  } readdir(D);
+  closedir(D);
+  return %dotqmail;
+}

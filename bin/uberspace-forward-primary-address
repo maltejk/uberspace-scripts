@@ -1,0 +1,54 @@
+#!/bin/sh
+########################################################################
+#
+# 2011-02-08
+# Jonas Pasche
+# jpasche@jonaspasche.com
+#
+########################################################################
+#
+#	This program is free software: you can redistribute it and/or modify
+#	it under the terms of the GNU General Public License as published by
+#	the Free Software Foundation, either version 3 of the License, or
+#	(at your option) any later version.
+#
+#	This program is distributed in the hope that it will be useful,
+#	but WITHOUT ANY WARRANTY; without even the implied warranty of
+#	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#	GNU General Public License for more details.
+#
+#	You should have received a copy of the GNU General Public License
+#	along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+########################################################################
+#
+# This script will create a .qmail file in a uberspace account.
+# It also forwards all unread mail in ~/Maildir/new/ to that address.
+#
+########################################################################
+
+if [ "`/usr/bin/id -u`" = "0" ] ; then
+  echo "This script is not designed to run as root. You need to run it as the user whose primary address should be forwarded.";
+  exit 1;
+fi
+
+if [ ! $# -ge 1 ];
+then
+  echo "You need to provide the target address(es)";
+  exit 2;
+fi
+
+if [ -e ${HOME}/.qmail ] ; then
+  echo "You already have a ${HOME}/.qmail"
+  exit 3;
+fi
+
+for T in $* ; do
+  echo $T >> ${HOME}/.qmail
+done
+
+# /var/qmail/bin/forward needs these ... make sure bounces get to the postmaster
+export NEWSENDER="postmaster@`cat /var/qmail/control/me`"
+export DTLINE=""
+
+find ${HOME}/Maildir/new -type f -exec sh -c "/var/qmail/bin/forward $* < {} && rm -f {}" \; 2>&1 | grep -v forward:

@@ -1,0 +1,35 @@
+#!/bin/sh
+########################################################################
+#
+# 2012-01-31
+# Jonas Pasche
+# jpasche@jonaspasche.com
+#
+########################################################################
+#
+#	This program is free software: you can redistribute it and/or modify
+#	it under the terms of the GNU General Public License as published by
+#	the Free Software Foundation, either version 3 of the License, or
+#	(at your option) any later version.
+#
+#	This program is distributed in the hope that it will be useful,
+#	but WITHOUT ANY WARRANTY; without even the implied warranty of
+#	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#	GNU General Public License for more details.
+#
+#	You should have received a copy of the GNU General Public License
+#	along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+########################################################################
+#
+# This script will setup a RVM environment for a user
+#
+########################################################################
+
+echo "This script used to be an installer for RVM in your Uberspace. However,"
+echo "the official RVM installer now does all the things that our script has"
+echo "been doing before, rendering our script obsolete. Please use the official"
+echo "RVM installer instead. You can find detailed instructions in our wiki:"
+echo
+echo "https://uberspace.de/dokuwiki/development:ruby#rvm"
+echo
