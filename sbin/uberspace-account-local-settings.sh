@@ -30,6 +30,6 @@
 ########################################################################
 
 # this is just an example to show how this file should look
-HOSTIP=95.143.172.53
-HOSTNAME=scorpius.uberspace.de
-SERVERADMIN=support@uberspace.de
+HOSTIP=176.221.43.145
+HOSTNAME=jb.mjk.me
+SERVERADMIN=malte@maltejk.de

@@ -60,7 +60,7 @@ mkdir /etc/run-svscan-${SUDO_USER}
 cat <<__EOF__ > /etc/run-svscan-${SUDO_USER}/run
 #!/bin/sh
 ulimit -u 300
-exec setuidgid ${SUDO_USER} /command/svscan ${SERVICE_DIR} 2>&1
+exec setuidgid ${SUDO_USER} /usr/bin/svscan ${SERVICE_DIR} 2>&1
 __EOF__
 chmod 755 /etc/run-svscan-${SUDO_USER}/run
 
@@ -72,7 +72,7 @@ echo -n "Waiting for the service to start ..."
 while [ $WAIT -lt 7 ]; do
   WAIT=$(($WAIT+1))
   echo -n " $WAIT"
-  /command/svok /service/svscan-${SUDO_USER}
+  /usr/bin/svok /service/svscan-${SUDO_USER}
   SVOK=$?
   if [ "$SVOK" = "0" ] ; then
     break

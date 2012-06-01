@@ -40,6 +40,7 @@
 ########################################################################
 
 source  /usr/local/sbin/uberspace-account-common
+source  /usr/local/sbin/uberspace-account-local-settings.sh
 
 checkforrootprivs;
 
@@ -300,6 +301,6 @@ else
   echo -e "OK $BURNEDADDRESS $PASS";
 fi
 
-echo -e "Hello.\nThis is ${0} on ${HOSTNAME}.\nI've just created a new uberspace account named ${USERNAME}.\nRegards,\n${0}" | mail -s "uberspace account created" mail@jonaspasche.com;
+echo -e "Hello.\nThis is ${0} on ${HOSTNAME}.\nI've just created a new uberspace account named ${USERNAME}.\nRegards,\n${0}" | mail -s "uberspace account created" $SERVERADMIN;
 
 exit 0;
