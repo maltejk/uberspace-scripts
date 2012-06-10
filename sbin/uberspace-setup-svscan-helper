@@ -26,6 +26,9 @@
 #
 ########################################################################
 
+source  /usr/local/sbin/uberspace-account-common
+source  /usr/local/sbin/uberspace-account-local-settings.sh
+
 if [ "${SUDO_USER}" = "" ] ; then
   echo "This script is intended to be run by sudo"
   exit 1
@@ -39,7 +42,7 @@ if [ "$?" != "0" ] ; then
 fi
 
 # This is the user's ~/service directory ("eval echo" is needed for tilde expansion)
-SERVICE_DIR=`eval echo ~${SUDO_USER}/service`
+SERVICE_DIR=`eval echo ~${SUDO_USER}/.service`
 
 # We don't write anything into a user's $HOME; the user has to create ~/service himself
 if [ ! -d ${SERVICE_DIR} ] ; then
@@ -90,5 +93,5 @@ echo " started!"
 
 # final information
 echo
-echo "Congratulations - your personal ~/service directory is now ready to use!"
+echo "Congratulations - your personal ~/.service directory is now ready to use!"
 echo
