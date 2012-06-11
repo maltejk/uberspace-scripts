@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 ########################################################################
 #
 # 2011-02-09
@@ -452,7 +452,7 @@ check_netqmail() {
 
   symlink_should_exist /usr/sbin/sendmail
 
-  file_should_contain /var/qmail/alias/.qmail-postmaster support@jonaspasche.com
+  file_should_contain /var/qmail/alias/.qmail-postmaster malte@maltejk.de
 
   # the StartCom class 2 intermediate certificate needs to be contained here (sub.class2.server.ca.pem)
   file_should_contain /var/qmail/control/servercert.pem MIIH4zCCBcugAwIBAgIBCzANBgkqhkiG9w0BAQUFADB9MQswCQYDVQQGEwJJTDEW
@@ -590,11 +590,11 @@ check_apache() {
   directory_should_not_exist /var/log/httpd/fastcgi
   service_should_exist       handle_virtual_logs
 
-  file_should_not_exist /usr/lib*/httpd/modules/mod_perl.so
-  file_should_not_exist /usr/lib*/httpd/modules/mod_php?.so
+  file_should_not_exist /usr/lib*/apache2/modules/mod_perl.so
+  file_should_not_exist /usr/lib*/apache2/modules/mod_php?.so
 
-  if [ -f /etc/httpd/conf.d/fcgid.conf ] ; then
-    file_should_contain /etc/httpd/conf.d/fcgid.conf "FcgidMaxRequestLen 67108864"
+  if [ -f /etc/apache2/modules-enabled/fcgid.conf ] ; then
+    file_should_contain /etc/apache2/modules-enabled/fcgid.conf "FcgidMaxRequestLen 67108864"
   fi
 
   # Workaround for an unfixed Apache bug:
@@ -602,7 +602,7 @@ check_apache() {
   file_should_contain /etc/httpd/conf/dyncontent.conf "HTTP:Range"
 
   # privacy reasons (only root needs to read this)
-  permissions_should_be /etc/httpd/conf.d 700
+  permissions_should_be /etc/apache2/conf.d 700
 }
 
 check_pound() {

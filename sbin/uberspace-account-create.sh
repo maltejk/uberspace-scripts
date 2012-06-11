@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 ########################################################################
 #
 # 2010-10-01
@@ -193,7 +193,7 @@ chmod 0664 /home/${USERNAME}/etc/phpversion;
 
 {
 cat <<EOF
-#!/bin/sh
+#!/bin/bash
 ## `date +%Y-%m-%d` $0 
 . ~/etc/phpversion
 export PHPRC="/home/${USERNAME}/etc"

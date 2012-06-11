@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 ########################################################################
 #
 # 2011-03-24
@@ -70,7 +70,7 @@ __EOF__
 echo "Creating the ~/etc/run-couchdb/run service run script"
 mkdir ~/etc/run-couchdb
 cat <<__EOF__ > ~/etc/run-couchdb/run
-#!/bin/sh
+#!/bin/bash
 export HOME=$HOME
 exec couchdb -n -a $HOME/couchdb.ini 2>&1
 __EOF__
@@ -80,7 +80,7 @@ chmod 755 ~/etc/run-couchdb/run
 echo "Creating the ~/etc/run-couchdb/log/run logging run script"
 mkdir ~/etc/run-couchdb/log
 cat <<__EOF__ > ~/etc/run-couchdb/log/run
-#!/bin/sh
+#!/bin/bash
 exec multilog t ./main
 __EOF__
 chmod 755 ~/etc/run-couchdb/log/run

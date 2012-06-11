@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 ########################################################################
 #
 # 2011-03-03
@@ -74,7 +74,7 @@ fi
 echo "Creating the ~/etc/run-spamd/run service run script"
 mkdir ~/etc/run-spamd
 cat <<__EOF__ > ~/etc/run-spamd/run
-#!/bin/sh
+#!/bin/bash
 exec /usr/bin/spamd --local --socketpath=$HOME/tmp/spamd.sock -s stderr 2>&1
 __EOF__
 chmod 755 ~/etc/run-spamd/run
@@ -83,7 +83,7 @@ chmod 755 ~/etc/run-spamd/run
 echo "Creating the ~/etc/run-spamd/log/run logging run script"
 mkdir ~/etc/run-spamd/log
 cat <<__EOF__ > ~/etc/run-spamd/log/run
-#!/bin/sh
+#!/bin/bash
 exec multilog t ./main
 __EOF__
 chmod 755 ~/etc/run-spamd/log/run

@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 ########################################################################
 #
 # 2011-03-03
@@ -26,8 +26,8 @@
 #
 ########################################################################
 
-source  /usr/local/sbin/uberspace-account-common
-source  /usr/local/sbin/uberspace-account-local-settings.sh
+source /usr/local/sbin/uberspace-account-common
+source /usr/local/sbin/uberspace-account-local-settings.sh
 
 if [ "${SUDO_USER}" = "" ] ; then
   echo "This script is intended to be run by sudo"
@@ -61,7 +61,7 @@ done
 echo "Creating the /etc/run-svscan-${SUDO_USER}/run script"
 mkdir /etc/run-svscan-${SUDO_USER}
 cat <<__EOF__ > /etc/run-svscan-${SUDO_USER}/run
-#!/bin/sh
+#!/bin/bash
 ulimit -u 300
 exec setuidgid ${SUDO_USER} /usr/bin/svscan ${SERVICE_DIR} 2>&1
 __EOF__

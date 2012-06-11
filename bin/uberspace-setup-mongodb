@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 ########################################################################
 #
 # 2011-03-03
@@ -59,7 +59,7 @@ MONGODB_PASS=`apg -n 1`
 echo "Creating the ~/etc/run-mongodb/run service run script"
 mkdir ~/etc/run-mongodb
 cat <<__EOF__ > ~/etc/run-mongodb/run
-#!/bin/sh
+#!/bin/bash
 exec mongod --dbpath ~/mongodb --bind_ip 127.0.0.1 --port $MONGODB_PORT --auth --nohttpinterface 2>&1
 __EOF__
 chmod 755 ~/etc/run-mongodb/run
@@ -68,7 +68,7 @@ chmod 755 ~/etc/run-mongodb/run
 echo "Creating the ~/etc/run-mongodb/log/run logging run script"
 mkdir ~/etc/run-mongodb/log
 cat <<__EOF__ > ~/etc/run-mongodb/log/run
-#!/bin/sh
+#!/bin/bash
 exec multilog t ./main
 __EOF__
 chmod 755 ~/etc/run-mongodb/log/run
