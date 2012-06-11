@@ -81,8 +81,8 @@ then
 	exit 2;
 fi
 
-VHOSTCONF="/etc/httpd/conf.d/virtual6.${USERNAME}.conf";
-DOMCONF="/etc/httpd/conf.d/xaliasdomain6.${USERNAME}-${DOMAIN}.conf";
+VHOSTCONF="/etc/apache2/vhosts.d/virtual6.${USERNAME}.conf";
+DOMCONF="/etc/apache2/vhosts.d/xaliasdomain6.${USERNAME}-${DOMAIN}.conf";
 
 ## remove domain from VirtualHost (supporting both the old "www.$DOMAIN" and the new "*.$DOMAIN" syntax
 grep -qe "^ServerAlias $DOMAIN " $VHOSTCONF && sed -i -e '/^ServerAlias '"$DOMAIN"' .*/d' $VHOSTCONF || notinconfig

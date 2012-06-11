@@ -30,7 +30,7 @@
 
 function ipv6off
 {
-	echo -e "Could not find \"/etc/httpd/conf.d/virtual6.${USERNAME}.conf\". IPv6 is probably not activated for ${USER}.";
+	echo -e "Could not find \"/etc/apache2/vhosts.d/virtual6.${USERNAME}.conf\". IPv6 is probably not activated for ${USER}.";
 	exit 1;
 }
 
@@ -92,7 +92,7 @@ then
 	exit 2;
 fi
 
-VHOSTCONF="/etc/httpd/conf.d/virtual6.${USERNAME}.conf";
+VHOSTCONF="/etc/apache2/vhosts.d/virtual6.${USERNAME}.conf";
 POOL="/etc/ipv6-address-pool/index.txt";
 
 ## this includes host specific variables

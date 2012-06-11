@@ -108,10 +108,6 @@ fi
 ## add system account
 /usr/sbin/useradd ${USERNAME};
 
-## FTP is disabled for uberspace by default, so add user to blocklists
-addtoftpusers;
-addtoftpuser_list;
-
 ## set quota
 #/usr/sbin/setquota -g ${USERNAME} 102400 112640 0 0 /;
 /usr/sbin/setquota -g ${USERNAME} 10485760 11534336 0 0 /;
@@ -179,24 +175,24 @@ chgrp ${USERNAME} /var/www/virtual/${USERNAME}/logs;
 
 ln -s /var/www/virtual/${USERNAME}/* /home/${USERNAME};
 
-mkdir -m 0700 /home/${USERNAME}/etc;
-chown ${USERNAME}:${USERNAME} /home/${USERNAME}/etc;
+mkdir -m 0700 /home/${USERNAME}/.etc;
+chown ${USERNAME}:${USERNAME} /home/${USERNAME}/.etc;
 
 {
 cat <<EOF
 ## `date +%Y-%m-%d` $0 
 PHPVERSION=5
 EOF
-} > /home/${USERNAME}/etc/phpversion;
-chown ${USERNAME}.${USERNAME} /home/${USERNAME}/etc/phpversion;
-chmod 0664 /home/${USERNAME}/etc/phpversion;
+} > /home/${USERNAME}/.etc/phpversion;
+chown ${USERNAME}.${USERNAME} /home/${USERNAME}/.etc/phpversion;
+chmod 0664 /home/${USERNAME}/etc/.phpversion;
 
 {
 cat <<EOF
 #!/bin/bash
 ## `date +%Y-%m-%d` $0 
 . ~/etc/phpversion
-export PHPRC="/home/${USERNAME}/etc"
+export PHPRC="/home/${USERNAME}/.etc"
 exec /package/host/localhost/php-\${PHPVERSION}/bin/php-cgi
 EOF
 } > /var/www/virtual/${USERNAME}/fcgi-bin/php-fcgi-starter;
@@ -219,7 +215,7 @@ SuexecUserGroup ${USERNAME} ${USERNAME}
 DocumentRoot /var/www/virtual/${USERNAME}/html
 ScriptAlias /cgi-bin /var/www/virtual/${USERNAME}/cgi-bin
 ScriptAlias /fcgi-bin /var/www/virtual/${USERNAME}/fcgi-bin
-Include /etc/httpd/conf/dyncontent.conf
+Include /etc/apache2/misc-conf.d/dyncontent
 
 RewriteEngine On
 
@@ -233,8 +229,8 @@ RewriteRule (.*) /var/www/virtual/${USERNAME}/%{HTTP_HOST}/\$1
 
 </VirtualHost>
 EOF
-} > /etc/httpd/conf.d/virtual.${USERNAME}.conf
-chmod 640 /etc/httpd/conf.d/virtual.${USERNAME}.conf;
+} > /etc/apache2/vhosts.d/virtual.${USERNAME}.conf
+chmod 640 /etc/apache2/vhosts.d/virtual.${USERNAME}.conf;
 
 {
 cat <<EOF
@@ -246,8 +242,8 @@ SuexecUserGroup ${USERNAME} ${USERNAME}
 DocumentRoot /var/www/virtual/${USERNAME}/html
 ScriptAlias /cgi-bin /var/www/virtual/${USERNAME}/cgi-bin
 ScriptAlias /fcgi-bin /var/www/virtual/${USERNAME}/fcgi-bin
-Include /etc/httpd/conf/ssl-uberspace.conf
-Include /etc/httpd/conf/dyncontent.conf
+Include /etc/apache2/misc-conf.d/ssl-uberspace
+Include /etc/apache2/misc-conf.d/dyncontent
 
 RewriteEngine On
 
@@ -256,21 +252,29 @@ RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
 
 </VirtualHost>
 EOF
-} > /etc/httpd/conf.d/ssl.${USERNAME}.conf
-chmod 640 /etc/httpd/conf.d/ssl.${USERNAME}.conf;
+} > /etc/apache2/vhosts.d/ssl.${USERNAME}.conf
+chmod 640 /etc/apache2/vhosts.d/ssl.${USERNAME}.conf;
 
 ## this triggers a script that will restart httpd within the next five minutes
 touch /root/please_restart_httpd;
 
-# no setup IPv6 (our new default, integration into this script pending)
-/usr/local/sbin/uberspace-account-6on.sh -u ${USERNAME}
+# no setup IPv6
+#/usr/local/sbin/uberspace-account-6on.sh -u ${USERNAME}
+
+## we need to return the ipv6-address 
+#POOL="/etc/ipv6-address-pool/index.txt";
+#BURNEDADDRESS=`grep -e " ${USERNAME}$" ${POOL} | cut -d " " -f 1`;
+
+#if [ "$BURNEDADDRESS" == "" ]; then
+#  echo -e "OK $PASS";
+#else 
+#  echo -e "OK $BURNEDADDRESS $PASS";
+#fi
 
 ## create user account and database in MySQL 
 mysql -u root -e "CREATE DATABASE \`${USERNAME}\`;";
 mysql -u root -e "GRANT ALL PRIVILEGES ON \`${USERNAME}\`.* TO \`${USERNAME}\`@\`localhost\` IDENTIFIED BY '$MYSQLPASS';";
 mysql -u root -e "GRANT ALL PRIVILEGES ON \`${USERNAME}\_%\`.* TO \`${USERNAME}\`@\`localhost\` IDENTIFIED BY '$MYSQLPASS';";
-
-# additional databases can be added (and removed) with uberspace-account-userdb-[create|delete]
 
 chgrp ${USERNAME} /var/lib/mysql/${USERNAME};
 chmod g+s /var/lib/mysql/${USERNAME};
@@ -290,16 +294,6 @@ EOF
 } > /home/${USERNAME}/.my.cnf;
 chmod 0600 /home/${USERNAME}/.my.cnf;
 chown ${USERNAME}:${USERNAME} /home/${USERNAME}/.my.cnf;
-
-## we need to return the ipv6-address 
-POOL="/etc/ipv6-address-pool/index.txt";
-BURNEDADDRESS=`grep -e " ${USERNAME}$" ${POOL} | cut -d " " -f 1`;
-
-if [ "$BURNEDADDRESS" == "" ]; then
-  echo -e "OK $PASS";
-else 
-  echo -e "OK $BURNEDADDRESS $PASS";
-fi
 
 echo -e "Hello.\nThis is ${0} on ${HOSTNAME}.\nI've just created a new uberspace account named ${USERNAME}.\nRegards,\n${0}" | mail -s "uberspace account created" $SERVERADMIN;
 

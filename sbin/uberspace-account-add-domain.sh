@@ -84,7 +84,7 @@ then
 	exit 2;
 fi
 
-VHOSTCONF="/etc/httpd/conf.d/virtual.${USERNAME}.conf";
+VHOSTCONF="/etc/apache2/vhosts.d/virtual.${USERNAME}.conf";
 
 ## this includes host specific variables
 . /usr/local/sbin/uberspace-account-local-settings.sh;
@@ -123,7 +123,7 @@ touch /root/please_restart_qmail-send;
 touch /root/please_restart_httpd;
 
 ## if the following file exists, asume that IPv6 is enabled for that account and call uberspace-account-add-domain6.sh
-if [ -e /etc/httpd/conf.d/virtual6.${USERNAME}.conf ]; then
+if [ -e /etc/apache2/vhosts.d/virtual6.${USERNAME}.conf ]; then
 	/usr/local/sbin/uberspace-account-add-domain6.sh -u ${USERNAME} -d ${DOMAIN}
 fi
 

@@ -26,6 +26,8 @@
 #
 ########################################################################
 
+source /usr/local/sbin/uberspace-account-local-settings.sh
+
 usage() {
   echo "Usage: $0 <servicename> <command> [<args> ...]"
   echo "for example: $0 mydaemon ~/bin/daemon"
@@ -53,12 +55,12 @@ if [ "$COMMAND" = "" ] ; then
   exit 1
 fi
 
-if [ ! -d ~/service ] ; then
-  echo "You don't seem to have a ~/service directory. Did you execute uberspace-setup-svscan before?"
+if [ ! -d ~/.service ] ; then
+  echo "You don't seem to have a ~/.service directory. Did you execute uberspace-setup-svscan before?"
   exit 2
 fi
 
-for DIR in ~/etc/run-$SERVICENAME ~/service/$SERVICENAME ; do
+for DIR in ~/.etc/run-$SERVICENAME ~/.service/$SERVICENAME ; do
   if [ -d $DIR ] ; then
     echo "The $DIR directory already exists"
     exit 2
@@ -70,8 +72,8 @@ if [ ! -x $COMMAND ] ; then
   exit 3
 fi
 
-echo "Creating the ~/etc/run-$SERVICENAME/run service run script"
-mkdir ~/etc/run-$SERVICENAME
+echo "Creating the ~/.etc/run-$SERVICENAME/run service run script"
+mkdir ~/.etc/run-$SERVICENAME
 cat <<__EOF__ > ~/etc/run-$SERVICENAME/run
 #!/bin/bash
 
@@ -85,25 +87,25 @@ export HOME=$HOME
 # Now let's go!
 exec $COMMAND $@ 2>&1
 __EOF__
-chmod +x ~/etc/run-$SERVICENAME/run
+chmod +x ~/.etc/run-$SERVICENAME/run
 
-echo "Creating the ~/etc/run-$SERVICENAME/log/run logging run script"
-mkdir ~/etc/run-$SERVICENAME/log
-cat <<__EOF__ > ~/etc/run-$SERVICENAME/log/run
+echo "Creating the ~/.etc/run-$SERVICENAME/log/run logging run script"
+mkdir ~/.etc/run-$SERVICENAME/log
+cat <<__EOF__ > ~/.etc/run-$SERVICENAME/log/run
 #!/bin/bash
 exec multilog t ./main
 __EOF__
-chmod +x ~/etc/run-$SERVICENAME/log/run
+chmod +x ~/.etc/run-$SERVICENAME/log/run
 
-echo "Symlinking ~/etc/run-$SERVICENAME to ~/service/$SERVICENAME to start the service"
-ln -s ../etc/run-$SERVICENAME ~/service/$SERVICENAME
+echo "Symlinking ~/.etc/run-$SERVICENAME to ~/.service/$SERVICENAME to start the service"
+ln -s ../.etc/run-$SERVICENAME ~/.service/$SERVICENAME
 
 WAIT=0
 echo -n "Waiting for the service to start ..."
 while [ $WAIT -lt 7 ]; do
   WAIT=$(($WAIT+1))
   echo -n " $WAIT"
-  /command/svok ~/service/$SERVICENAME
+  /command/svok ~/.service/$SERVICENAME
   SVOK=$?
   if [ "$SVOK" = "0" ] ; then
     break

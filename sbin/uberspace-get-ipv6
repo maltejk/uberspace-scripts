@@ -73,12 +73,12 @@ fi
 POOL="/etc/ipv6-address-pool/index.txt";
 
 ## check wether IPv6 was activated for this user
-if [ ! -e /etc/httpd/conf.d/virtual6.${USERNAME}.conf ]; then
-    echo "Error: /etc/httpd/conf.d/virtual6.${USERNAME}.conf doesn't exist.";
+if [ ! -e /etc/apache2/vhosts.d/virtual6.${USERNAME}.conf ]; then
+    echo "Error: /etc/apache2/vhosts.d/virtual6.${USERNAME}.conf doesn't exist.";
     exit 1;
 fi
-if [ ! -e /etc/httpd/conf.d/ssl6.${USERNAME}.conf ]; then
-    echo "Error: /etc/httpd/conf.d/ssl6.${USERNAME}.conf doesn't exist.";
+if [ ! -e /etc/apache2/vhosts.d/ssl6.${USERNAME}.conf ]; then
+    echo "Error: /etc/apache2/vhosts.d/ssl6.${USERNAME}.conf doesn't exist.";
     exit 1;
 fi
 
