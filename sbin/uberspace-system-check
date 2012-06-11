@@ -523,7 +523,7 @@ check_tcpserver() {
 }
 
 
-check_phpmyadmin() {
+donot_check_phpmyadmin() {
 
   file_should_exist /etc/httpd/conf.d/virtual.pma.conf
   if ! [ $POUND ] ; then
@@ -549,7 +549,7 @@ check_phpmyadmin() {
 }
 
 
-check_adminer() {
+donot_check_adminer() {
 
   file_should_exist /etc/httpd/conf.d/virtual.adminer.conf
   if ! [ $POUND ] ; then
@@ -561,7 +561,7 @@ check_adminer() {
 }
 
 
-check_roundcube() {
+donot_check_roundcube() {
 
   file_should_exist /etc/httpd/conf.d/virtual.webmail.conf
   if ! [ $POUND ] ; then
@@ -587,7 +587,7 @@ check_roundcube() {
 check_apache() {
 
   directory_should_exist     /var/log/fastcgi
-  directory_should_not_exist /var/log/httpd/fastcgi
+  directory_should_not_exist /var/log/apache2/fastcgi
   service_should_exist       handle_virtual_logs
 
   file_should_not_exist /usr/lib*/apache2/modules/mod_perl.so
@@ -599,13 +599,13 @@ check_apache() {
 
   # Workaround for an unfixed Apache bug:
   # http://seclists.org/fulldisclosure/2011/Aug/241
-  file_should_contain /etc/httpd/conf/dyncontent.conf "HTTP:Range"
+  file_should_contain /etc/apache2/conf.d/dyncontent.conf "HTTP:Range"
 
   # privacy reasons (only root needs to read this)
   permissions_should_be /etc/apache2/conf.d 700
 }
 
-check_pound() {
+donot_check_pound() {
 
   if [[ $POUND -eq 1 || $MODSSL_POUND -eq 1 ]] ; then
     service_should_exist pound
@@ -619,7 +619,7 @@ check_pound() {
   fi
 }
 
-check_stats() {
+donot_check_stats() {
 
   group_should_be /etc/shadow apache
   permissions_should_be /etc/shadow 440
@@ -869,13 +869,13 @@ check_editors() {
   command_should_exist vim
 }
 
-check_mongodb() {
+donot_check_mongodb() {
 
   command_should_exist mongo
   command_should_exist mongod
 }
 
-check_couchdb() {
+donot_check_couchdb() {
 
   command_should_exist couchdb
   file_should_exist /etc/couchdb/default.ini
@@ -917,7 +917,7 @@ check_imagemagick() {
   command_should_exist Magick-config
 }
 
-check_gitolite() {
+donot_check_gitolite() {
 
   package_should_exist gitolite
   command_should_exist gl-setup
@@ -927,7 +927,7 @@ check_gitolite() {
   command_should_exist sshkeys-lint
 }
 
-check_webalizer() {
+donot_check_webalizer() {
 
   command_should_exist webalizer
   file_should_contain /etc/webalizer.conf '^#LogFile'
@@ -968,7 +968,7 @@ check_spamassassin() {
 
 }
 
-check_google_authenticator() {
+donot_check_google_authenticator() {
 
   # Support for two-way authentication
   # http://code.google.com/p/google-authenticator/
@@ -1001,7 +1001,7 @@ check_mtop() {
 
 }
 
-check_memcached() {
+donot_check_memcached() {
 
   # yum install memcached
   command_should_exist memcached
@@ -1017,7 +1017,7 @@ for KEYFILE in /etc/pki/tls/private/*.key ; do
 done
 }
 
-check_zsh() {
+donot_check_zsh() {
 
   # compile manually
   package_should_exist zsh
@@ -1027,7 +1027,7 @@ check_zsh() {
 
 }
 
-check_erlang() {
+donot_check_erlang() {
 
   # old Erlang from distro
   file_should_exist /usr/bin/erl
@@ -1039,7 +1039,7 @@ check_erlang() {
 
 }
 
-check_lua() {
+donot_check_lua() {
 
   # old Lua from distro
   file_should_exist /usr/bin/lua
@@ -1063,7 +1063,7 @@ check_healthcheck() {
   file_should_contain /service/uberspace-account-healthcheck/run HOME=/root
 }
 
-check_gnutls() {
+donot_check_gnutls() {
 
   # nettle from source
   # https://dokuwiki.lyra.uberspace.de/dokuwiki/doku.php/software:nettle
@@ -1078,7 +1078,7 @@ check_gnutls() {
   package_should_exist gnutls
 }
 
-check_weechat() {
+donot_check_weechat() {
 
   # weechat from source
   # https://dokuwiki.lyra.uberspace.de/dokuwiki/doku.php/software:weechat
