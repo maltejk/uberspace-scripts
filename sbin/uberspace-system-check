@@ -327,7 +327,7 @@ check_common() {
   command_should_exist lftp
 
   # needed for our nagios/icinga check
-  file_should_exist /home/dbcheck/cgi-bin/check
+  #file_should_exist /home/dbcheck/cgi-bin/check
 
   # yum install imapsync
   command_should_exist imapsync
@@ -517,7 +517,7 @@ check_dovecot() {
 
 check_tcpserver() {
 
-  binary_should_contain /usr/local/bin/tcpserver TCP6
+  binary_should_contain /usr/bin/tcpserver TCP6
 
   command_should_exist tcpserver
 }
