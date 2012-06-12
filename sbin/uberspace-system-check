@@ -237,11 +237,11 @@ fail() {
 
 check_common() {
 
-  if [ "`dnsdomainname`" = "uberspace.de" ] ; then
-    pass "dnsdomainname resolves to uberspace.de"
-  else
-    fail "dnsdomainname does not resolve to uberspace.de"
-  fi
+  #if [ "`dnsdomainname`" = "uberspace.de" ] ; then
+  #  pass "dnsdomainname resolves to uberspace.de"
+  #else
+  #  fail "dnsdomainname does not resolve to uberspace.de"
+  #fi
 
   service_should_exist clear
 
@@ -859,11 +859,11 @@ check_ruby() {
 check_editors() {
 
   # manually compiled
-  package_should_exist vim
-  command_should_exist vim7.3
+  #package_should_exist vim
+  #command_should_exist vim7.3
 
   # yum install joe
-  command_should_exist joe
+  #command_should_exist joe
 
   # yum install vim-enhanced
   command_should_exist vim
@@ -881,7 +881,7 @@ donot_check_couchdb() {
   file_should_exist /etc/couchdb/default.ini
 }
 
-check_uberroot() {
+donot_check_uberroot() {
 
   file_should_contain /home/uberroot/.ssh/authorized_keys "AAAAB3NzaC1yc2EAAAABIwAAAQEAzemLn04VCUIZuoGiQ89mU6y5Oq4FBO1oFIusBm0uy/jggZrezl50/ntDFbSdCvd8P4xKr\+\+hFN/ug7SkikEULFwQ2efDw7RU45I4iT74St2v7Oa3L/cFV3RNB1sazkzfNyyogwKoykzrD69oRtJLwLsMY09JIMTS7erzIgWimMq5xo2/jzDcfRXaqsO8SDVuQE40SLe3xZz7cXdVRWmG2h\+XCpsc8AbqlU0RtcomaT2Lz44lQHMJpZA7bBU6WkFNB52PvQEiQTIOxByTmKB9kVCZeSCyn/q5Y\+E9pykYAsqTmZzT8DD/oa7O3QvVlI\+8suA9QLcNFZszGdosi4YtTQ=="
   file_should_contain /etc/sudoers "^uberroot "
