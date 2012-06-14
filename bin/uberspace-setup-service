@@ -105,7 +105,7 @@ echo -n "Waiting for the service to start ..."
 while [ $WAIT -lt 7 ]; do
   WAIT=$(($WAIT+1))
   echo -n " $WAIT"
-  /command/svok ~/.service/$SERVICENAME
+  /usr/bin/svok ~/.service/$SERVICENAME
   SVOK=$?
   if [ "$SVOK" = "0" ] ; then
     break
