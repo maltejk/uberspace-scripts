@@ -38,6 +38,7 @@ SERVICENAME=$1
 shift
 
 if [[ ! "$SERVICENAME" =~ "^[a-z]" ]] ; then
+  echo "sevicename should not be $SERVICENAME."
   usage
 fi
 
@@ -45,6 +46,7 @@ TESTCOMMAND=$1
 shift
 
 if [ "$TESTCOMMAND" = "" ] ; then
+  echo "command should not be $TESTCOMMAND."
   usage
 fi
 
