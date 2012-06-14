@@ -35,7 +35,8 @@ if [ "${SUDO_USER}" = "" ] ; then
 fi
 
 # confirm that there aren't any bad characters in the username
-echo ${SUDO_USER} | grep -q -E '^[a-z][a-z0-9]{0,7}$'
+# w00t for some reason, usernames are to be only 7 chars long. Increasing to 10
+echo ${SUDO_USER} | grep -q -E '^[a-z][a-z0-9]{0,10}$'
 if [ "$?" != "0" ] ; then
   echo "SUDO_USER does not contain a valid username"
   exit 2
