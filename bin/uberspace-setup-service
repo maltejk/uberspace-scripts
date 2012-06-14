@@ -76,7 +76,7 @@ fi
 
 echo "Creating the ~/.etc/run-$SERVICENAME/run service run script"
 mkdir ~/.etc/run-$SERVICENAME
-cat <<__EOF__ > ~/etc/run-$SERVICENAME/run
+cat <<__EOF__ > ~/.etc/run-$SERVICENAME/run
 #!/bin/bash
 
 # These environment variables are sometimes needed by the running daemons
