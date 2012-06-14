@@ -37,8 +37,9 @@ usage() {
 SERVICENAME=$1
 shift
 
-if [[ ! "$SERVICENAME" =~ "^[a-z]" ]] ; then
-  echo "sevicename should not be $SERVICENAME."
+# not working. bash fucked up shit or so
+#if [[ ! "$SERVICENAME" =~ "^[a-z]" ]] ; then
+if [[ -z "`echo "$SERVICENAME" | egrep '^[a-z]'`" ]] ; then 
   usage
 fi
 
@@ -46,7 +47,6 @@ TESTCOMMAND=$1
 shift
 
 if [ "$TESTCOMMAND" = "" ] ; then
-  echo "command should not be $TESTCOMMAND."
   usage
 fi
 
