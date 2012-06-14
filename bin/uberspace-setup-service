@@ -83,8 +83,8 @@ cat <<__EOF__ > ~/.etc/run-$SERVICENAME/run
 export USER=$USER
 export HOME=$HOME
 
-# Include the user-specific profile
-. \$HOME/.bash_profile
+# Include the user-specific profile, it's actually called .profile on debian.
+. \$HOME/.profile
 
 # Now let's go!
 exec $COMMAND $@ 2>&1
