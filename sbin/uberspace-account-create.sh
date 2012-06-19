@@ -105,12 +105,12 @@ if [ "`grep ^${USERNAME}: /etc/group`" != "" ] ; then
 	exit 1;
 fi
 
-## add system account
-/usr/sbin/useradd ${USERNAME};
+## add system account, group with same name, create ~, 
+useradd -U -m ${USERNAME};
 
 ## set quota
-#/usr/sbin/setquota -g ${USERNAME} 102400 112640 0 0 /;
-/usr/sbin/setquota -g ${USERNAME} 10485760 11534336 0 0 /;
+setquota -g ${USERNAME} 102400 112640 0 0 /;
+#setquota -g ${USERNAME} 10485760 11534336 0 0 /;
 
 ## if SSH public key was supplied, install it
 if [ "${SSHPUBKEYGIVEN}" ] ; then
@@ -121,12 +121,12 @@ if [ "${SSHPUBKEYGIVEN}" ] ; then
 	echo -e "Installed SSH public key.";
 else
 ## if no SSH public key was supplied, generate and set password
-	PASS=`/usr/bin/apg -M ncl -E \|1Il0O -r /usr/share/dict/words -n 1 -m 6 -x 10 -q -d 2>&1| sed "s/ .*//;"`;
-	echo $PASS | /usr/bin/passwd --stdin ${USERNAME} 2>&1 | grep -v "Changing password for user" | grep -v "passwd: all authentication tokens updated successfully";
+	PASS=`apg -a 1 -M ncl -E \|1Il0O -n 1 -m 10 -x 10 -q -d 2>&1| sed "s/ .*//;"`;
+	usermod --password "echo $PASS | mkpasswd --stdin" ${USERNAME}
 fi
 
 ## generate password for MySQL in any case
-MYSQLPASS=`/usr/bin/apg -M ncl -E \|1Il0O -r /usr/share/dict/words -n 1 -m 12 -x 20 -q -d 2>&1| sed "s/ .*//;"`;
+MYSQLPASS=`/usr/bin/apg -a 1 -M ncl -E \|1Il0O -n 1 -m 20 -x 20 -q -d 2>&1| sed "s/ .*//;"`;
 
 ## setup qmail
 if [ ! -d /home/${USERNAME}/Maildir ]; then
@@ -185,13 +185,13 @@ PHPVERSION=5
 EOF
 } > /home/${USERNAME}/.etc/phpversion;
 chown ${USERNAME}.${USERNAME} /home/${USERNAME}/.etc/phpversion;
-chmod 0664 /home/${USERNAME}/etc/.phpversion;
+chmod 0664 /home/${USERNAME}/.etc/phpversion;
 
 {
 cat <<EOF
 #!/bin/bash
 ## `date +%Y-%m-%d` $0 
-. ~/etc/phpversion
+. ~/.etc/phpversion
 export PHPRC="/home/${USERNAME}/.etc"
 exec /package/host/localhost/php-\${PHPVERSION}/bin/php-cgi
 EOF
