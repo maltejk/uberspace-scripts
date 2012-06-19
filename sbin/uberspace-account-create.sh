@@ -109,7 +109,7 @@ fi
 useradd -U -m -s /bin/bash ${USERNAME};
 
 ## set quota
-setquota -g ${USERNAME} 102400 112640 0 0 /;
+setquota -g ${USERNAME} 1024000 1126400 0 0 /;
 #setquota -g ${USERNAME} 10485760 11534336 0 0 /;
 
 ## if SSH public key was supplied, install it
@@ -123,6 +123,8 @@ else
 ## if no SSH public key was supplied, generate and set password
 	PASS=`apg -a 1 -M ncl -E \|1Il0O -n 1 -m 10 -x 10 -q -d 2>&1| sed "s/ .*//;"`;
 	usermod --password "echo $PASS | mkpasswd --stdin" ${USERNAME}
+	echo "Your password is $PASS" > /home/${USERNAME}/your_password.txt
+	chmod 600 /home/${USERNAME}/your_password.txt
 fi
 
 ## generate password for MySQL in any case
