@@ -123,7 +123,9 @@ else
 ## if no SSH public key was supplied, generate and set password
 	PASS=`apg -a 1 -M ncl -E \|1Il0O -n 1 -m 10 -x 10 -q -d 2>&1| sed "s/ .*//;"`;
 	usermod --password "echo $PASS | mkpasswd --stdin" ${USERNAME}
+## save user's password to file.
 	echo "Your password is $PASS" > /home/${USERNAME}/your_password.txt
+	chown ${USERNAME}:${USERNAME} /home/${USERNAME}/your_password.txt; 
 	chmod 600 /home/${USERNAME}/your_password.txt
 fi
 
