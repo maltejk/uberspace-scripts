@@ -159,7 +159,7 @@ touch /root/please_restart_qmail-send;
 ## prepare apache vhost
 
 mkdir -m 0750 /var/www/virtual/${USERNAME};
-chown ${USERNAME}:apache /var/www/virtual/${USERNAME};
+chown ${USERNAME}:www-data /var/www/virtual/${USERNAME};
 
 mkdir -m 0755 /var/www/virtual/${USERNAME}/html;
 chown ${USERNAME}:${USERNAME} /var/www/virtual/${USERNAME}/html;
