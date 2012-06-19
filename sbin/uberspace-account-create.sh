@@ -106,7 +106,7 @@ if [ "`grep ^${USERNAME}: /etc/group`" != "" ] ; then
 fi
 
 ## add system account, group with same name, create ~, 
-useradd -U -m ${USERNAME};
+useradd -U -m -s /bin/bash ${USERNAME};
 
 ## set quota
 setquota -g ${USERNAME} 102400 112640 0 0 /;
@@ -284,12 +284,11 @@ cat <<EOF
 ## `date +%Y-%m-%d` $0 $@
 [client]
 # Do NOT change your password here! It is meant to *access* your MySQL databases,
-# not to *set* the password. If you want to have your MySQL password changed,
-# please contact hallo@uberspace.de - thanks in advance!
+# not to *set* the password. 
 password=${MYSQLPASS}
 port=3306
 user=${USERNAME}
-socket=/var/lib/mysql/mysql.sock
+socket=/var/run/mysqld/mysqld.sock
 EOF
 } > /home/${USERNAME}/.my.cnf;
 chmod 0600 /home/${USERNAME}/.my.cnf;
