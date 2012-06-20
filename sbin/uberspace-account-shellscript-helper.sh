@@ -26,7 +26,7 @@
 # managment.
 #
 # It will check for
-# - root priviledges
+# - root privileges
 # - missing username
 # - illegal characters in usernames
 #

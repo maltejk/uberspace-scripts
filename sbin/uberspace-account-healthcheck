@@ -40,10 +40,12 @@ chmod -vc 600 /var/qmail/control/morercpthosts
 chmod -vc 700 /var/qmail/control/virtualdomains.d
 chmod -vc 600 /var/qmail/control/virtualdomains
 chmod -vc 6755 /usr/bin/checkvpw
-chmod -vc 640 /etc/phpMyAdmin/config.inc.php
 chmod -vc 440 /etc/shadow
 chmod -vc 600 /etc/pki/tls/private/*.key
 chmod -vc 600 /etc/pki/tls/private/*.pem
+
+echo "`basename $0` funktioniert noch nicht"
+exit 0
 
 function mail_diskusage () {
 
@@ -200,7 +202,7 @@ __EOF__
 MAILFILE=`mktemp /tmp/uberspace-account-healthcheck.XXXXXX`
 
 # argument for "mutt -c"
-CC=hallo@uberspace.de
+CC=malte@maltejk.de
 
 # also used by mutt
 export REPLYTO=hallo@uberspace.de

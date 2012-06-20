@@ -76,7 +76,7 @@ echo -n "Waiting for the service to start ..."
 while [ $WAIT -lt 7 ]; do
   WAIT=$(($WAIT+1))
   echo -n " $WAIT"
-  /usr/bin/svok /service/svscan-${SUDO_USER}
+  svok /service/svscan-${SUDO_USER}
   SVOK=$?
   if [ "$SVOK" = "0" ] ; then
     break

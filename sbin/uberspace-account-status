@@ -71,7 +71,7 @@ then
 	exit 2;
 fi
 
-if [ ! -f /etc/httpd/conf.d/virtual.${USERNAME}.conf ] ; then
+if [ ! -f /etc/apache2/sites-available/virtual.${USERNAME}.conf ] ; then
   echo "ERROR: not a uberspace user"
   exit 3;
 fi
@@ -79,13 +79,13 @@ fi
 # higher portability if the user does not reside in /home
 USERHOME=`eval echo ~${USERNAME}`
 
-echo domain_count `grep ^ServerAlias /etc/httpd/conf.d/virtual.${USERNAME}.conf | wc -l`
+echo domain_count `grep ^ServerAlias /etc/apache2/sites-available/virtual.${USERNAME}.conf | wc -l`
 
 if [ -e /var/www/virtual/${USERNAME}/logs/access_log ] ; then
   echo access_log_size `stat --printf=%s /var/www/virtual/${USERNAME}/logs/access_log`
 fi
 
-echo running_services `/command/svstat ${USERHOME}/service/* | grep " up " | wc -l`
+echo running_services `svstat ${USERHOME}/service/* | grep " up " | wc -l`
 
 if [ ! "$OPTIMIZE_FOR_DASHBOARD" ] ; then
   echo recent_files_in_vwv `find /var/www/virtual/${USERNAME} -mtime -30 | grep -v logs | wc -l`

@@ -29,6 +29,7 @@
 ########################################################################
 
 source  /usr/local/sbin/uberspace-account-common
+source  /usr/local/sbin/uberspace-account-local-settings.sh
 
 checkforrootprivs;
 
@@ -85,17 +86,11 @@ killall -u ${USERNAME}
 
 # IPv4 apache configs can be removed without further ado
 rm -f /etc/httpd/sites-available/xaliasdomain.${USERNAME}-*.conf
-a2dissite xaliasdomain.${USERNAME}-*
+a2dissite xaliasdomain.${USERNAME}-*.conf
 rm -f /etc/httpd/sites-available/virtual.${USERNAME}.conf
-a2dissite virtual.${USERNAME}
+a2dissite virtual.${USERNAME}.conf
 rm -f /etc/httpd/sites-available/ssl.${USERNAME}.conf
-a2dissite ssl.${USERNAME}
-
-# make sure that the webspace can be deleted in the next step
-# (this is only needed for older uberspaces which have an immutable starter)
-for STARTER in /var/www/virtual/${USERNAME}/fcgi-bin/php* ; do
-  chattr -i $STARTER
-done
+a2dissite ssl.${USERNAME}.conf
 
 # remove the webspace
 rm -rf /var/www/virtual/${USERNAME}
@@ -134,6 +129,6 @@ rm -rf /backup/${USERNAME}
 
 echo "OK Account wurde entfernt"
 
-echo -e "Hello.\nThis is ${0} on ${HOSTNAME}.\nI've just deleted an uberspace account named ${USERNAME}.\nRegards,\n${0}" | mail -s "uberspace account deleted" mail@jonaspasche.com;
+echo -e "Hello.\nThis is ${0} on ${HOSTNAME}.\nI've just deleted an uberspace account named ${USERNAME}.\nRegards,\n${0}" | mail -s "uberspace account deleted" $SERVERADMIN;
 
 exit 0;

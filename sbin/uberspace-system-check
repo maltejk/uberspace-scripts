@@ -525,16 +525,16 @@ check_tcpserver() {
 
 donot_check_phpmyadmin() {
 
-  file_should_exist /etc/httpd/conf.d/virtual.pma.conf
+  file_should_exist /etc/apache2/sites-available/virtual.pma.conf
   if ! [ $POUND ] ; then
-    file_should_exist /etc/httpd/conf.d/ssl.pma.conf
+    file_should_exist /etc/apache2/sites-available/ssl.pma.conf
   fi
   file_should_exist /usr/share/phpMyAdmin/libraries/vendor_config.php
   file_should_exist /etc/phpMyAdmin/config.inc.php
 
-  file_should_contain /etc/httpd/conf.d/virtual.pma.conf "DocumentRoot /usr/share/phpMyAdmin"
+  file_should_contain /etc/apache2/sites-available/virtual.pma.conf "DocumentRoot /usr/share/phpMyAdmin"
   if ! [ $POUND ] ; then
-    file_should_contain /etc/httpd/conf.d/ssl.pma.conf "DocumentRoot /usr/share/phpMyAdmin"
+    file_should_contain /etc/apache2/sites-available/ssl.pma.conf "DocumentRoot /usr/share/phpMyAdmin"
   fi
   file_should_contain /usr/share/phpMyAdmin/libraries/vendor_config.php "CONFIG_FILE', CONFIG_DIR . 'config.inc.php"
 
@@ -551,9 +551,9 @@ donot_check_phpmyadmin() {
 
 donot_check_adminer() {
 
-  file_should_exist /etc/httpd/conf.d/virtual.adminer.conf
+  file_should_exist /etc/apache2/sites-available/virtual.adminer.conf
   if ! [ $POUND ] ; then
-    file_should_exist /etc/httpd/conf.d/ssl.adminer.conf
+    file_should_exist /etc/apache2/sites-available/ssl.adminer.conf
   fi
   file_should_exist /var/www/virtual/adminer/html/adminer.php
 
@@ -599,10 +599,11 @@ check_apache() {
 
   # Workaround for an unfixed Apache bug:
   # http://seclists.org/fulldisclosure/2011/Aug/241
-  file_should_contain /etc/apache2/conf.d/dyncontent.conf "HTTP:Range"
+  file_should_contain /etc/apache2/dyncontent "HTTP:Range"
 
   # privacy reasons (only root needs to read this)
-  permissions_should_be /etc/apache2/conf.d 700
+  permissions_should_be /etc/apache2/sites-available 700
+  permissions_should_be /etc/apache2/sites-enabled 700
 }
 
 donot_check_pound() {
@@ -621,12 +622,12 @@ donot_check_pound() {
 
 donot_check_stats() {
 
-  group_should_be /etc/shadow apache
+  group_should_be /etc/shadow www-data
   permissions_should_be /etc/shadow 440
 
-  file_should_contain /etc/httpd/conf.d/virtual.stats.conf "DocumentRoot /var/www/html/stats"
+  file_should_contain /etc/apache2/sites-available/virtual.stats.conf "DocumentRoot /var/www/html/stats"
   if ! [ $POUND ] ; then
-    file_should_contain /etc/httpd/conf.d/ssl.stats.conf "DocumentRoot /var/www/html/stats"
+    file_should_contain /etc/apache2/sites-available/ssl.stats.conf "DocumentRoot /var/www/html/stats"
   fi
   directory_should_exist /var/www/html/stats
 
@@ -1052,7 +1053,7 @@ donot_check_lua() {
 
 }
 
-check_healthcheck() {
+donot_check_healthcheck() {
 
   service_should_exist uberspace-account-healthcheck
 
