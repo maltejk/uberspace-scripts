@@ -655,7 +655,7 @@ check_qmail_autoresponder() {
 }
 
 
-check_php() {
+donot_check_php() {
 
   package_should_exist php-5
   package_should_exist php-5.2
@@ -687,7 +687,7 @@ check_php() {
 }
 
 
-check_nodejs() {
+donot_check_nodejs() {
 
   package_should_exist nodejs
 
@@ -710,7 +710,7 @@ check_ezmlm_idx() {
 }
 
 
-check_perl() {
+donot_check_perl() {
 
   file_should_exist /usr/bin/perl
   command_should_exist perl
@@ -749,7 +749,7 @@ check_locate() {
   command_should_exist locate
 }
 
-check_python() {
+donot_check_python() {
 
   # there should be a generic python with setuptools
   command_should_exist python
@@ -832,7 +832,7 @@ check_sqlite() {
   package_should_exist sqlite
 }
 
-check_ruby() {
+donot_check_ruby() {
 
   file_should_exist /usr/bin/ruby
   file_should_exist /usr/bin/rails
@@ -910,7 +910,7 @@ check_vcs() {
   command_should_exist bzr
 }
 
-check_imagemagick() {
+donot_check_imagemagick() {
 
   # yum install ImageMagick
   command_should_exist convert
@@ -993,7 +993,7 @@ donot_check_google_authenticator() {
 
 }
 
-check_mtop() {
+donot_check_mtop() {
 
   # yum install mtop (from rpmforge)
   command_should_exist mtop
@@ -1089,7 +1089,7 @@ donot_check_weechat() {
   command_should_exist weechat-curses
 }
 
-check_zmodem() {
+donot_check_zmodem() {
   command_should_exist zssh
   command_should_exist sz
   command_should_exist rz
