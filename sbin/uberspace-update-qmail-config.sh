@@ -46,14 +46,23 @@ emit_warning ${MRHTMP}
 chown --reference=${QMAIL_HOME}/control/morercpthosts ${MRHTMP}  || exit 1
 chmod --reference=${QMAIL_HOME}/control/morercpthosts ${MRHTMP}  || exit 1
 # generate morercpthosts out of morercpthosts.d/* and run qmail-newmrh
-( /bin/ls -1 ${QMAIL_HOME}/control/morercpthosts.d >> ${MRHTMP} && mv -f ${MRHTMP} ${QMAIL_HOME}/control/morercpthosts && ${QMAIL_HOME}/bin/qmail-newmrh && chown --reference=${QMAIL_HOME}/control/morercpthosts ${QMAIL_HOME}/control/morercpthosts.cdb && chmod --reference=${QMAIL_HOME}/control/morercpthosts ${QMAIL_HOME}/control/morercpthosts.cdb ) || exit 1
+( 
+	ls -1 ${QMAIL_HOME}/control/morercpthosts.d >> ${MRHTMP} && \ 
+	mv -f ${MRHTMP} ${QMAIL_HOME}/control/morercpthosts && \
+	${QMAIL_HOME}/bin/qmail-newmrh && \
+	chown --reference=${QMAIL_HOME}/control/morercpthosts ${QMAIL_HOME}/control/morercpthosts.cdb && \
+	chmod --reference=${QMAIL_HOME}/control/morercpthosts ${QMAIL_HOME}/control/morercpthosts.cdb 
+) || exit 1
 
 # create temporary file to prevent data loss on concurrent access
 VDTMP=`mktemp ${QMAIL_HOME}/control/virtualdomains.tmp.XXXXXX`   || exit 1
 emit_warning ${VDTMP}
 # inherit ownership and permissions from the existing file
 chown --reference=${QMAIL_HOME}/control/virtualdomains ${VDTMP} || exit 1
-chmod --reference=${QMAIL_HOME}/control/virtualdomains ${VDTMP} || exit 1
 # generate virtualdomains out of virtualdomains.d/* and give qmail-send a HUP
-( /bin/grep -r . ${QMAIL_HOME}/control/virtualdomains.d | awk -F / '{ print $NF }' >> ${VDTMP} && mv -f ${VDTMP} ${QMAIL_HOME}/control/virtualdomains && /command/svc -h /service/qmail-send ) || exit 1
+( 
+	grep -r . ${QMAIL_HOME}/control/virtualdomains.d | awk -F / '{ print $NF }' >> ${VDTMP} && \
+	mv -f ${VDTMP} ${QMAIL_HOME}/control/virtualdomains && \
+	svc -h /service/qmail-send 
+) || exit 1
 
