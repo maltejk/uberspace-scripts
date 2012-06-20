@@ -123,11 +123,6 @@ rm /var/qmail/control/virtualdomains.d/${USERNAME}.${HOSTNAME};
 # this will trigger a script that will restart qmail-send within the next five minutes
 touch /root/please_restart_qmail-send;
 
-# remove FTP configuration
-rm -f /etc/vsftpd/userconf/${USERNAME}
-removefromftpusers;
-removefromftpuser_list;
-
 # remove system user
 /usr/sbin/userdel -r ${USERNAME}
 
