@@ -84,9 +84,12 @@ killall -u ${USERNAME}
 /usr/local/sbin/uberspace-account-6off.sh -u ${USERNAME};
 
 # IPv4 apache configs can be removed without further ado
-rm -f /etc/httpd/conf.d/xaliasdomain.${USERNAME}-*.conf
-rm -f /etc/httpd/conf.d/virtual.${USERNAME}.conf
-rm -f /etc/httpd/conf.d/ssl.${USERNAME}.conf
+rm -f /etc/httpd/sites-available/xaliasdomain.${USERNAME}-*.conf
+a2dissite xaliasdomain.${USERNAME}-*
+rm -f /etc/httpd/sites-available/virtual.${USERNAME}.conf
+a2dissite virtual.${USERNAME}
+rm -f /etc/httpd/sites-available/ssl.${USERNAME}.conf
+a2dissite ssl.${USERNAME}
 
 # make sure that the webspace can be deleted in the next step
 # (this is only needed for older uberspaces which have an immutable starter)
