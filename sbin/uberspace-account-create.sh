@@ -219,7 +219,7 @@ SuexecUserGroup ${USERNAME} ${USERNAME}
 DocumentRoot /var/www/virtual/${USERNAME}/html
 ScriptAlias /cgi-bin /var/www/virtual/${USERNAME}/cgi-bin
 ScriptAlias /fcgi-bin /var/www/virtual/${USERNAME}/fcgi-bin
-Include /etc/apache2/misc-conf.d/dyncontent
+Include /etc/apache2/dyncontent
 
 RewriteEngine On
 
@@ -237,7 +237,7 @@ EOF
 chmod 640 /etc/apache2/sites-available/virtual.${USERNAME}.conf;
 
 # enable vhost
-a2ensite virtual.${USERNAME}
+a2ensite virtual.${USERNAME}.conf
 
 {
 cat <<EOF
@@ -263,7 +263,7 @@ EOF
 chmod 640 /etc/apache2/sites-available/ssl.${USERNAME}.conf;
 
 # enable ssl vhost. not nao, we have no ssl cert.
-#a2ensite ssl.${USERNAME}
+#a2ensite ssl.${USERNAME}.conf
 
 ## this triggers a script that will restart httpd within the next five minutes
 touch /root/please_restart_httpd;
