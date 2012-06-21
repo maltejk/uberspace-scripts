@@ -39,7 +39,7 @@ if [ ! -d ~/service ] ; then
   exit 2
 fi
 
-for DIR in ~/couchdb ~/service/couchdb ~/etc/run-couchdb ; do
+for DIR in ~/couchdb ~/.service/couchdb ~/.etc/run-couchdb ; do
   if [ -d $DIR ] ; then
     echo "You already have a $DIR directory. Nothing to do here."
     exit 3
@@ -66,48 +66,8 @@ cat <<__EOF__ >> ~/couchdb.ini
 $COUCHDB_USER = $COUCHDB_PASS
 __EOF__
 
-# create the couchdb service run script
-echo "Creating the ~/etc/run-couchdb/run service run script"
-mkdir ~/etc/run-couchdb
-cat <<__EOF__ > ~/etc/run-couchdb/run
-#!/bin/bash
-export HOME=$HOME
-exec couchdb -n -a $HOME/couchdb.ini 2>&1
-__EOF__
-chmod 755 ~/etc/run-couchdb/run
-
-# create the couchdb logging run script
-echo "Creating the ~/etc/run-couchdb/log/run logging run script"
-mkdir ~/etc/run-couchdb/log
-cat <<__EOF__ > ~/etc/run-couchdb/log/run
-#!/bin/bash
-exec multilog t ./main
-__EOF__
-chmod 755 ~/etc/run-couchdb/log/run
-
-echo "Symlinking ~/etc/run-couchdb to ~/service/couchdb to start the service"
-ln -s ../etc/run-couchdb ~/service/couchdb
-
-WAIT=0
-echo -n "Waiting for the service to start ..."
-while [ $WAIT -lt 6 ]; do
-  WAIT=$(($WAIT+1))
-  echo -n " $WAIT"
-  svok ~/service/couchdb 2>/dev/null
-  SVOK=$?
-  if [ "$SVOK" = "0" ] ; then
-    break
-  fi
-  sleep 1
-done
-
-if [ "$SVOK" != "0" ] ; then
-  echo " failed :-("
-  echo "We're really sorry; this shouldn't have happened - please contact hallo@uberspace.de for help. Thanks a lot!"
-  exit 4
-fi
-
-echo " started!"
+# replaced duplicate create-service-code here
+uberspace-setup-service couchdb couchdb -n -a $HOME/couchdb.ini
 
 # final information
 echo

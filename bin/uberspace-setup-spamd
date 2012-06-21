@@ -33,7 +33,7 @@ if [ "$MY_UID" = "0" ] ; then
   exit 1
 fi
 
-if [ ! -d ~/service ] ; then
+if [ ! -d ~/.service ] ; then
   echo "You need to have a working ~/service directory first!"
   echo "This needs to be set up only once; you can use ~/service for a couple of things, not only spamd."
   echo "To set up ~/service read https://uberspace.de/dokuwiki/system:daemontools or just use our setup-script" 
@@ -41,7 +41,7 @@ if [ ! -d ~/service ] ; then
   exit 2
 fi
 
-for DIR in ~/service/spamd ~/etc/run-spamd ; do
+for DIR in ~/.service/spamd ~/.etc/run-spamd ; do
   if [ -d $DIR ] ; then
     echo "You already have a $DIR directory. Nothing to do here."
     exit 3
@@ -70,47 +70,7 @@ rewrite_header Subject [SPAM]
 __EOF__
 fi
 
-# create the spamd service run script
-echo "Creating the ~/etc/run-spamd/run service run script"
-mkdir ~/etc/run-spamd
-cat <<__EOF__ > ~/etc/run-spamd/run
-#!/bin/bash
-exec /usr/bin/spamd --local --socketpath=$HOME/tmp/spamd.sock -s stderr 2>&1
-__EOF__
-chmod 755 ~/etc/run-spamd/run
-
-# create the spamd logging run script
-echo "Creating the ~/etc/run-spamd/log/run logging run script"
-mkdir ~/etc/run-spamd/log
-cat <<__EOF__ > ~/etc/run-spamd/log/run
-#!/bin/bash
-exec multilog t ./main
-__EOF__
-chmod 755 ~/etc/run-spamd/log/run
-
-echo "Symlinking ~/etc/run-spamd to ~/service/spamd to start the service"
-ln -s ../etc/run-spamd ~/service/spamd
-
-WAIT=0
-echo -n "Waiting for the service to start ..."
-while [ $WAIT -lt 6 ]; do
-  WAIT=$(($WAIT+1))
-  echo -n " $WAIT"
-  svok ~/service/spamd 2>/dev/null
-  SVOK=$?
-  if [ "$SVOK" = "0" ] ; then
-    break
-  fi
-  sleep 1
-done
-
-if [ "$SVOK" != "0" ] ; then
-  echo " failed :-("
-  echo "We're really sorry; this shouldn't have happened - please contact hallo@uberspace.de for help. Thanks a lot!"
-  exit 4
-fi
-
-echo " started!"
+uberspace-setup-service spamd spamd --local --socketpath=$HOME/tmp/spamd.sock -s stderr
 
 # final information
 echo
