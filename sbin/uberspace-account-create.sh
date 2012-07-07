@@ -32,6 +32,7 @@
 # -h	help message
 # -u	username (mandatory)
 # -k	optional public SSH key, enclosed with "
+# -n    do not create user. Must already exist.
 #
 # If no SSH public key is supplied, a password will be generated.
 # A password for MySQL will be generated and stored in the users .my.cnf
@@ -68,6 +69,11 @@ while getopts ":hu:k:" Option; do
 				SSHPUBKEYGIVEN=1;
 				SSHPUBKEY=${OPTARG};
 			;;
+		n   )
+				USERNAMEGIVEN=1;
+				USERNAME=${OPTARG};
+				NOCREATEUSER=1;
+			;;			
 		?	)
 				printf "Invalid option or option without parameter: -${OPTARG}\n$USAGE" $(basename $0) >&2
 				exit 2;
@@ -90,44 +96,48 @@ fi
 ## this includes host specific variables
 . /usr/local/sbin/uberspace-account-local-settings.sh;
 
-if [ "`grep ^${USERNAME}: /etc/passwd`" != "" ] ; then
-	echo -e "Ein Benutzer dieses Namens existiert bereits (passwd)";
-	exit 1;
-fi
+## dont trigger usercreation if NOCREATEUSER == 1
+if [ "x$NOCREATEUSER" != "x1" ] ; then 
 
-if [ -e /home/${USERNAME} ] ; then
-	echo -e "Ein Benutzer dieses Namens existiert bereits (home)";
-	exit 1;
-fi
+	if [ "`grep ^${USERNAME}: /etc/passwd`" != "" ] ; then
+		echo -e "Ein Benutzer dieses Namens existiert bereits (passwd)";
+		exit 1;
+	fi
 
-if [ "`grep ^${USERNAME}: /etc/group`" != "" ] ; then
-	echo -e "Eine Gruppe dieses Namens existiert bereits";
-	exit 1;
-fi
+	if [ -e /home/${USERNAME} ] ; then
+		echo -e "Ein Benutzer dieses Namens existiert bereits (home)";
+		exit 1;
+	fi
 
-## add system account, group with same name, create ~, 
-useradd -U -m -s /bin/bash ${USERNAME};
+	if [ "`grep ^${USERNAME}: /etc/group`" != "" ] ; then
+		echo -e "Eine Gruppe dieses Namens existiert bereits";
+		exit 1;
+	fi
 
-## set quota
-setquota -g ${USERNAME} 1024000 1126400 0 0 /;
-#setquota -g ${USERNAME} 10485760 11534336 0 0 /;
+	## add system account, group with same name, create ~, 
+	useradd -U -m -s /bin/bash ${USERNAME};
 
-## if SSH public key was supplied, install it
-if [ "${SSHPUBKEYGIVEN}" ] ; then
-	mkdir -p -m 0700 /home/${USERNAME}/.ssh/;
-	echo ${SSHPUBKEY} > /home/${USERNAME}/.ssh/authorized_keys;
-	chmod 0600 /home/${USERNAME}/.ssh/authorized_keys;
-	chown -R ${USERNAME}:${USERNAME} /home/${USERNAME};
-	echo -e "Installed SSH public key.";
-else
-## if no SSH public key was supplied, generate and set password
-	PASS=`apg -a 1 -M ncl -E \|1Il0O -n 1 -m 10 -x 10 -q -d 2>&1| sed "s/ .*//;"`;
-	usermod --password "`echo $PASS | mkpasswd --stdin`" ${USERNAME}
-## save user's password to file.
-	echo "Your password is $PASS" > /home/${USERNAME}/your_password.txt
-	chown ${USERNAME}:${USERNAME} /home/${USERNAME}/your_password.txt; 
-	chmod 600 /home/${USERNAME}/your_password.txt
-fi
+	## set quota
+	setquota -g ${USERNAME} 1024000 1126400 0 0 /;
+	#setquota -g ${USERNAME} 10485760 11534336 0 0 /;
+
+	## if SSH public key was supplied, install it
+	if [ "${SSHPUBKEYGIVEN}" ] ; then
+		mkdir -p -m 0700 /home/${USERNAME}/.ssh/;
+		echo ${SSHPUBKEY} > /home/${USERNAME}/.ssh/authorized_keys;
+		chmod 0600 /home/${USERNAME}/.ssh/authorized_keys;
+		chown -R ${USERNAME}:${USERNAME} /home/${USERNAME};
+		echo -e "Installed SSH public key.";
+	else
+		## if no SSH public key was supplied, generate and set password
+		PASS=`apg -a 1 -M ncl -E \|1Il0O -n 1 -m 10 -x 10 -q -d 2>&1| sed "s/ .*//;"`;
+		usermod --password "`echo $PASS | mkpasswd --stdin`" ${USERNAME}
+		## save user's password to file.
+		echo "Your password is $PASS" > /home/${USERNAME}/your_password.txt
+		chown ${USERNAME}:${USERNAME} /home/${USERNAME}/your_password.txt; 
+		chmod 600 /home/${USERNAME}/your_password.txt
+	fi
+fi ## NOCREATEUSER != 1
 
 ## generate password for MySQL in any case
 MYSQLPASS=`/usr/bin/apg -a 1 -M ncl -E \|1Il0O -n 1 -m 20 -x 20 -q -d 2>&1| sed "s/ .*//;"`;
