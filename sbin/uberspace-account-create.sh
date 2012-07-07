@@ -54,7 +54,7 @@ then
 fi
 
 ## Parse arguments
-while getopts ":hu:k:" Option; do
+while getopts ":nhu:k:" Option; do
 	case $Option in
 		h	)
 				printf "$USAGE" $(basename $0);
