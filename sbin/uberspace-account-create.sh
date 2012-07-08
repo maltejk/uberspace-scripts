@@ -197,7 +197,8 @@ cat <<EOF
 ## `date +%Y-%m-%d` $0 
 . ~/.etc/phpversion
 export PHPRC="/home/${USERNAME}/.etc"
-exec /package/host/localhost/php-\${PHPVERSION}/bin/php-cgi
+#exec /package/host/localhost/php-\${PHPVERSION}/bin/php-cgi
+exec /usr/bin/php-cgi
 EOF
 } > /var/www/virtual/${USERNAME}/fcgi-bin/php-fcgi-starter;
 
