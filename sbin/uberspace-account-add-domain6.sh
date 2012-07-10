@@ -92,7 +92,7 @@ then
 	exit 2;
 fi
 
-VHOSTCONF="/etc/apache2/vhosts.d/virtual6.${USERNAME}.conf";
+VHOSTCONF="/etc/apache2/sites-available/virtual6.${USERNAME}.conf";
 POOL="/etc/ipv6-address-pool/index.txt";
 
 ## this includes host specific variables

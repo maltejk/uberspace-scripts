@@ -167,7 +167,7 @@ fi
 		H=$(printf "%X\n" $COUNTFROM);
 		CURRENTIP=`echo "${PREFIX}:${H}" | tr "[:upper:]" "[:lower:]"`;
 
-# make shure that the address isn't already in the poolfile
+# make sure that the address isn't already in the poolfile
 		grep -q "${CURRENTIP} " $POOLFILE;
 		INPOOL=$?;
 		if [ "$INPOOL" == "1" ]; then

@@ -79,8 +79,8 @@ then
 	exit 2;
 fi
 
-VHOSTCONF="/etc/apache2/vhosts.d/virtual.${USERNAME}.conf";
-DOMCONF="/etc/apache2/vhosts.d/xaliasdomain.${USERNAME}-$DOMAIN.conf";
+VHOSTCONF="/etc/apache2/sites-available/virtual.${USERNAME}.conf";
+DOMCONF="/etc/apache2/sites-available/xaliasdomain.${USERNAME}-$DOMAIN.conf";
 
 ## remove domain from VirtualHost (supporting both the old "www.$DOMAIN" and the new "*.$DOMAIN" syntax
 grep -qe "^ServerAlias $DOMAIN " $VHOSTCONF && sed -i -e '/^ServerAlias '"$DOMAIN"' .*/d' $VHOSTCONF || notinconfig
@@ -109,7 +109,7 @@ touch /root/please_restart_qmail-send;
 touch /root/please_restart_httpd;
 
 ## if the following file exists, asume that IPv6 is enabled for that account and call uberspace-account-del-domain6.sh
-if [ -e /etc/apache2/vhosts.d/virtual6.${USERNAME}.conf ]; then
+if [ -e /etc/apache2/sites-available/virtual6.${USERNAME}.conf ]; then
 	/usr/local/sbin/uberspace-account-del-domain6.sh -u ${USERNAME} -d ${DOMAIN}
 fi
 
