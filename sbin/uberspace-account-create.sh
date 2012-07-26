@@ -285,7 +285,9 @@ touch /root/please_restart_httpd;
 ## create user account and database in MySQL 
 mysql -u root -e "CREATE DATABASE \`${USERNAME}\`;";
 mysql -u root -e "GRANT ALL PRIVILEGES ON \`${USERNAME}\`.* TO \`${USERNAME}\`@\`localhost\` IDENTIFIED BY '$MYSQLPASS';";
+mysql -u root -e "GRANT ALL PRIVILEGES ON \`${USERNAME}\`.* TO \`${USERNAME}\`@\`127.0.0.1\` IDENTIFIED BY '$MYSQLPASS';";
 mysql -u root -e "GRANT ALL PRIVILEGES ON \`${USERNAME}\_%\`.* TO \`${USERNAME}\`@\`localhost\` IDENTIFIED BY '$MYSQLPASS';";
+mysql -u root -e "GRANT ALL PRIVILEGES ON \`${USERNAME}\_%\`.* TO \`${USERNAME}\`@\`127.0.0.1\` IDENTIFIED BY '$MYSQLPASS';";
 
 chgrp ${USERNAME} /var/lib/mysql/${USERNAME};
 chmod g+s /var/lib/mysql/${USERNAME};
