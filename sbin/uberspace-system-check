@@ -269,16 +269,16 @@ check_common() {
   # yum install gd-devel
   command_should_exist gdlib-config
 
-  # yum install screen
+  # apt-get install screen
   command_should_exist screen
 
-  # yum install tmux
+  # apt-get install tmux
   command_should_exist tmux
 
-  # yum install irssi
+  # apt-get install irssi
   command_should_exist irssi
 
-  # yum install libotr
+  # apt-get install libotr
   file_should_exist /usr/lib*/libotr.so.2
 
   # simply copy from any other uberspace host
@@ -287,7 +287,7 @@ check_common() {
   # this file should definitely be immutable (it contains host-specific settings)
   file_should_have_attr /usr/local/sbin/uberspace-account-local-settings.sh i
 
-  # yum install bison (needed to compile e.g. mono)
+  # apt-get install bison (needed to compile e.g. mono)
   command_should_exist bison
 
   # yum install getmail
@@ -297,37 +297,29 @@ check_common() {
   command_should_exist toast
   file_should_exist /etc/profile.d/toast.sh
 
-  # yum install curl-devel
+  # apt-get install curl-devel
   command_should_exist curl-config
 
-  # yum install libxml2-devel
+  # apt-get install libxml2-devel
   command_should_exist xml2-config
 
-  # yum install libxslt-devel
+  # apt-get install libxslt-devel
   command_should_exist xslt-config
 
-  # yum install mc
+  # apt-get install mc
   command_should_exist mc
 
-  # yum install libyaml-devel (for Ruby compilation)
+  # apt-get install libyaml-devel (for Ruby compilation)
   file_should_exist /usr/include/yaml.h
 
-  # yum install libicu-devel
+  # apt-get install libicu-devel
   command_should_exist icu-config
 
-  # yum install lynx
+  # apt-get install lynx
   command_should_exist lynx
 
-  # ca-bundle.crt on CentOS 5 is outdated and is missing the DigiCert root certificate
-  # which affects especially https://github.com/ - quick fix:
-  # curl https://www.digicert.com/testroot/DigiCertHighAssuranceEVRootCA.crt >> /etc/pki/tls/certs/ca-bundle.crt
-  file_should_contain /etc/pki/tls/certs/ca-bundle.crt "MIIDxTCCAq2gAwIBAgIQAqxcJmoLQJuPC3nyrkYldzANBgkqhkiG9w0BAQUFADBs"
-
-  # yum install lftp
+  # apt-get install lftp
   command_should_exist lftp
-
-  # needed for our nagios/icinga check
-  #file_should_exist /home/dbcheck/cgi-bin/check
 
   # yum install imapsync
   command_should_exist imapsync
@@ -336,20 +328,14 @@ check_common() {
   # needed for e.g. "toast arm bitlbee"
   file_should_exist /lib*/libglib-2.0.so
 
-  # yum install libgdiplus
+  # apt-get install libgdiplus
   file_should_exist /usr/lib*/libgdiplus.so.0
 
-  # yum install zip
+  # apt-get install zip
   command_should_exist zip
 
   # yum install libtasn1
   file_should_exist /usr/lib*/libtasn1.so.3
-
-  # manually compiled openssl 1.0.0g for pound
-  package_should_exist openssl
-
-  # openssl does not ship a CA bundle by default, symlink the global one
-  symlink_should_exist /package/host/localhost/openssl/ssl/cert.pem
 
 }
 
