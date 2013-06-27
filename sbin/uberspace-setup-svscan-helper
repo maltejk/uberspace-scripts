@@ -52,7 +52,7 @@ if [ ! -d ${SERVICE_DIR} ] ; then
 fi
 
 # Check if we already have some job running here
-for DIR in /service/svscan-${SUDO_USER} /etc/run-svscan-${SUDO_USER} ; do
+for DIR in /etc/service/svscan-${SUDO_USER} /etc/run-svscan-${SUDO_USER} ; do
   if [ -d $DIR ] ; then
     echo "The $DIR directory already exists"
     exit 4
@@ -69,14 +69,14 @@ __EOF__
 chmod 755 /etc/run-svscan-${SUDO_USER}/run
 
 echo "Symlinking /etc/run-svscan-${SUDO_USER} to /service/svscan-${SUDO_USER} to start the service"
-ln -s /etc/run-svscan-${SUDO_USER} /service/svscan-${SUDO_USER}
+ln -s /etc/run-svscan-${SUDO_USER} /etc/service/svscan-${SUDO_USER}
 
 WAIT=0
 echo -n "Waiting for the service to start ..."
 while [ $WAIT -lt 7 ]; do
   WAIT=$(($WAIT+1))
   echo -n " $WAIT"
-  svok /service/svscan-${SUDO_USER}
+  svok /etc/service/svscan-${SUDO_USER}
   SVOK=$?
   if [ "$SVOK" = "0" ] ; then
     break
