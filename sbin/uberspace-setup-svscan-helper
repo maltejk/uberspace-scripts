@@ -42,6 +42,11 @@ if [ "$?" != "0" ] ; then
   exit 2
 fi
 
+if [ ! -d /etc/service ] ; then
+  echo "/etc/service does not exist. ubuntu is stupid."
+  mkdir /etc/service
+fi
+
 # This is the user's ~/service directory ("eval echo" is needed for tilde expansion)
 SERVICE_DIR=`eval echo ~${SUDO_USER}/.service`
 
