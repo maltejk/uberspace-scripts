@@ -1,0 +1,87 @@
+#!/bin/bash
+
+# missing license from uberspace. see https://twitter.com/maltejk/status/377051331653275649
+
+MYUID=`id -u`
+
+if [ "$MYUID" = "0" ] ; then
+  echo "This script is not meant to be run as root."
+  exit 1
+fi
+
+if [ ! -d ~/service ] ; then
+  echo "You don't have a ~/service directory."
+  echo "Please run \"uberspace-setup-svscan\" first to initialize daemon-tools before setting up Redis."
+  exit 1
+fi
+
+for DIR in ~/.redis ~/service/redis ~/etc/run-redis ; do
+  if [ -d $DIR ] ; then
+    echo "You already have a $DIR directory. Nothing to do here."
+    exit 1
+  fi
+done
+
+# We no longer need to build redis. It's preinstalled on all hosts.
+#echo "Installing redis. This might take some time."
+#toast arm redis
+
+# create configuration for redis
+echo "Creating Redis-configuration"
+mkdir ~/.redis
+cat <<__EOF__ > ~/.redis/conf
+unixsocket /home/$USER/.redis/sock
+daemonize no
+logfile stdout
+port 0
+__EOF__
+
+mkdir ~/etc/run-redis
+cat <<__EOF__ > ~/etc/run-redis/run
+#!/bin/sh
+exec redis-server ~/.redis/conf 2>&1
+__EOF__
+chmod 755 ~/etc/run-redis/run
+
+# Create the logging-script for redis/daemon-tools
+echo "Creating the ~/etc/run-redis/log/run logging run script"
+mkdir ~/etc/run-redis/log
+cat <<__EOF__ > ~/etc/run-redis/log/run
+#!/bin/sh
+exec multilog t ./main
+__EOF__
+chmod 755 ~/etc/run-redis/log/run
+
+echo "Creating symlink for ~/etc/run-redis to ~/service/redis to start the service"
+ln -s ../etc/run-redis ~/service/redis
+
+# Check if redis-service starts sucessfully
+WAIT=0
+echo -n "Waiting for Redis to start..."
+while [ $WAIT -lt 6 ]; do
+  WAIT=$(($WAIT+1))
+  echo -n "."
+  svok ~/service/redis 2>/dev/null
+  SVOK=$?
+  if [ "$SVOK" = "0" ] ; then
+    break
+  fi
+  sleep 1
+done
+
+if [ "$SVOK" != "0" ] ; then
+  echo " failed."
+  echo "We're really sorry; this shouldn't have happened - please contact hallo@uberspace.de for help. Thanks a lot!"
+  exit 4
+fi
+
+# famous last words
+echo "Everything's been setup. You can use Redis now."
+echo
+echo "Please note that Redis does not use TCP."
+echo "Instead, we setup Redis to use a UNIX-Socket to connect to."
+echo
+echo "To connect to redis via socket, use:"
+echo
+echo "redis-cli -s ~/.redis/sock"
+echo
