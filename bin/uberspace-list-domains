@@ -26,7 +26,8 @@
 #
 ########################################################################
 
-if [ "${SUDO_USER}" = "" ] ; then
+if [ "${SUDO_USER}" != "$USER" ] ; then
+  echo "sudoing user is $SUDO_USER."
   exec sudo -n $0 $@
 fi
 
