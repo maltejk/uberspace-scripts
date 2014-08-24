@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 ########################################################################
 #
 # 2010-09-01
@@ -26,7 +26,7 @@
 # managment.
 #
 # It will check for
-# - root privileges
+# - root priviledges
 # - missing username
 # - illegal characters in usernames
 #

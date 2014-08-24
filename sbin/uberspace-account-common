@@ -61,4 +61,124 @@ function noconfig ()
 	exit 1;
 }
 
-# no ftp. kthx
+function removefromftpusers ()
+{
+grep -e "^${USERNAME}$" /etc/vsftpd/ftpusers;
+ISBLOCKED1=$?;
+if [ "${ISBLOCKED1}" == "1" ]; then
+	echo "User ${USERNAME} is not on FTP blocklist (/etc/vsftpd/ftpusers).";
+elif [ "${ISBLOCKED1}" == "0" ]; then
+	/bin/cp /etc/vsftpd/ftpusers /etc/vsftpd/ftpusers.bak;
+	sed -i -e '/^'"${USERNAME}"'$/d' /etc/vsftpd/ftpusers;
+	echo "Removed User ${USERNAME} from FTP blocklist (/etc/vsftpd/ftpusers).";
+fi
+}
+
+function removefromftpuser_list ()
+{
+grep -e "^${USERNAME}$" /etc/vsftpd/user_list;
+ISBLOCKED2=$?;
+if [ "${ISBLOCKED2}" == "1" ]; then
+	echo "User ${USERNAME} is not on FTP blocklist (/etc/vsftpd/user_list).";
+elif [ "${ISBLOCKED2}" == "0" ]; then
+	/bin/cp /etc/vsftpd/user_list /etc/vsftpd/user_list.bak;
+	sed -i -e '/^'"${USERNAME}"'$/d' /etc/vsftpd/user_list;
+	echo "Removed User ${USERNAME} from FTP blocklist (/etc/vsftpd/user_list).";
+fi
+}
+
+function addtoftpusers ()
+{
+grep -e "^${USERNAME}$" /etc/vsftpd/ftpusers;
+ISBLOCKED1=$?;
+if [ "${ISBLOCKED1}" == "0" ]; then
+	echo "User ${USERNAME} is already on FTP blocklist (/etc/vsftpd/ftpusers).";
+elif [ "${ISBLOCKED1}" == "1" ]; then
+	/bin/cp /etc/vsftpd/ftpusers /etc/vsftpd/ftpusers.bak;
+	echo ${USERNAME} >> /etc/vsftpd/ftpusers;
+	echo "Added User ${USERNAME} to FTP blocklist (/etc/vsftpd/ftpusers).";
+fi
+}
+
+function addtoftpuser_list ()
+{
+grep -e "^${USERNAME}$" /etc/vsftpd/user_list;
+ISBLOCKED2=$?;
+if [ "${ISBLOCKED2}" == "0" ]; then
+	echo "User ${USERNAME} is already on FTP blocklist (/etc/vsftpd/user_list).";
+elif [ "${ISBLOCKED2}" == "1" ]; then
+	/bin/cp /etc/vsftpd/user_list /etc/vsftpd/user_list.bak;
+	echo ${USERNAME} >> /etc/vsftpd/user_list;
+	echo "Added User ${USERNAME} to FTP blocklist (/etc/vsftpd/user_list).";
+fi
+}
+
+function sanitize_hostname () {
+
+  ETLDDAT=/etc/effective_tld_names.dat
+
+  # convert domain to lowercase and convert to idn (if necessary)
+  THIS_HOSTNAME=`echo "$1" | tr '[:upper:]' '[:lower:]' | idn --quiet`
+
+  if [[ ! ${THIS_HOSTNAME} =~ ^(\*\.)?[a-z0-9][a-z0-9.-]*[a-z0-9]$ ]] ; then
+    echo "Invalid characters in hostname"
+    return 1
+  fi
+
+  if [[ ! ${THIS_HOSTNAME} =~ \.(.+) ]] ; then
+    echo "This hostname has no '.' in it"
+    return 1
+  fi
+
+  # this is the hostname with the first label stripped
+  # so we can match "some.tld" against "*.tld"
+  CHECKPART=${BASH_REMATCH[1]}
+
+  SUCCESS=0
+
+  grep -q -E "^\!${THIS_HOSTNAME}\$" ${ETLDDAT}
+  if [ "$?" = "0" ] ; then
+    SUCCESS=1
+  fi
+
+  grep -q -E "^${THIS_HOSTNAME}\$" ${ETLDDAT}
+  if [ "$?" = "0" ] ; then
+    echo "Uh-oh: You can only use hostnames like 'blah.${THIS_HOSTNAME}', not '${THIS_HOSTNAME}' itself ('${THIS_HOSTNAME}' is an eTLD)."
+    return 1
+  fi
+
+  grep -q -E "^\*\.${CHECKPART}\$" ${ETLDDAT}
+  if [ "$?" = "0" ] ; then
+    echo "Uh-oh: '*.${CHECKPART}' is reserved by the registry; you can only use hostnames under a sub-TLD like 'blah.SUB.${CHECKPART}'."
+    exit 1
+  fi
+
+  while true ; do
+    grep -q -E "^\*\.${CHECKPART}\$" ${ETLDDAT}
+    if [ "$?" = "0" ] ; then
+      SUCCESS=1
+      break
+    fi
+    grep -q -E "^${CHECKPART}\$" ${ETLDDAT}
+    if [ "$?" = "0" ] ; then
+      SUCCESS=1
+      break
+    fi
+    # cut the first label of the hostname
+    if [[ $CHECKPART =~ \.(.+) ]] ; then
+      CHECKPART=${BASH_REMATCH[1]}
+    else
+      echo "Uh-oh: Could not find a valid suffix for ${THIS_HOSTNAME}; you can't use it."
+      return 1
+    fi
+  done
+
+  if [ "$SUCCESS" = "0" ] ; then
+    echo "Uh-oh: I did not foresee how to get here."
+    return 1
+  fi
+
+  echo ${THIS_HOSTNAME}
+  return 0
+}
+

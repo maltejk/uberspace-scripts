@@ -1,10 +1,6 @@
-#!/bin/bash
+#!/bin/sh
 ########################################################################
-#
-# 2011-03-03
-# Jonas Pasche
-# jpasche@jonaspasche.com
-#
+# 2011-03-03 Jonas Pasche jpasche@jonaspasche.com
 ########################################################################
 #
 #	This program is free software: you can redistribute it and/or modify
@@ -21,13 +17,10 @@
 #	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 ########################################################################
-#
 # This script helps uberspace-setup-svscan with the parts that need root privs.
-#
 ########################################################################
-
-source /usr/local/sbin/uberspace-account-common
-source /usr/local/sbin/uberspace-account-local-settings.sh
+# 2014-08-04 mwerner@jonaspasche.com: drop privileges in folder check
+########################################################################
 
 if [ "${SUDO_USER}" = "" ] ; then
   echo "This script is intended to be run by sudo"
@@ -35,29 +28,29 @@ if [ "${SUDO_USER}" = "" ] ; then
 fi
 
 # confirm that there aren't any bad characters in the username
-# w00t for some reason, usernames are to be only 7 chars long. Increasing to 10
-echo ${SUDO_USER} | grep -q -E '^[a-z][a-z0-9]{0,10}$'
+echo ${SUDO_USER} | grep -q -E '^[a-z][a-z0-9]{0,7}$'
 if [ "$?" != "0" ] ; then
   echo "SUDO_USER does not contain a valid username"
   exit 2
 fi
 
-if [ ! -d /etc/service ] ; then
-  echo "/etc/service does not exist. ubuntu is stupid."
-  mkdir /etc/service
-fi
-
 # This is the user's ~/service directory ("eval echo" is needed for tilde expansion)
-SERVICE_DIR=`eval echo ~${SUDO_USER}/.service`
+export SERVICE_DIR=`eval echo ~${SUDO_USER}/service`
 
+check_as_user(){
 # We don't write anything into a user's $HOME; the user has to create ~/service himself
 if [ ! -d ${SERVICE_DIR} ] ; then
   echo "The ${SERVICE_DIR} directory does not exist yet"
   exit 3
 fi
+}
+export -f check_as_user
+
+# drop privileges (Ticket #155722)
+su ${SUDO_USER} -s /bin/bash -c 'check_as_user'
 
 # Check if we already have some job running here
-for DIR in /etc/service/svscan-${SUDO_USER} /etc/run-svscan-${SUDO_USER} ; do
+for DIR in /service/svscan-${SUDO_USER} /etc/run-svscan-${SUDO_USER} ; do
   if [ -d $DIR ] ; then
     echo "The $DIR directory already exists"
     exit 4
@@ -67,21 +60,21 @@ done
 echo "Creating the /etc/run-svscan-${SUDO_USER}/run script"
 mkdir /etc/run-svscan-${SUDO_USER}
 cat <<__EOF__ > /etc/run-svscan-${SUDO_USER}/run
-#!/bin/bash
+#!/bin/sh
 ulimit -u 300
-exec setuidgid ${SUDO_USER} /usr/bin/svscan ${SERVICE_DIR} 2>&1
+exec setuidgid ${SUDO_USER} /command/svscan ${SERVICE_DIR} 2>&1
 __EOF__
 chmod 755 /etc/run-svscan-${SUDO_USER}/run
 
-echo "Symlinking /etc/run-svscan-${SUDO_USER} to /etc/service/svscan-${SUDO_USER} to start the service"
-ln -s /etc/run-svscan-${SUDO_USER} /etc/service/svscan-${SUDO_USER}
+echo "Symlinking /etc/run-svscan-${SUDO_USER} to /service/svscan-${SUDO_USER} to start the service"
+ln -s /etc/run-svscan-${SUDO_USER} /service/svscan-${SUDO_USER}
 
 WAIT=0
 echo -n "Waiting for the service to start ..."
 while [ $WAIT -lt 7 ]; do
   WAIT=$(($WAIT+1))
   echo -n " $WAIT"
-  svok /etc/service/svscan-${SUDO_USER}
+  /command/svok /service/svscan-${SUDO_USER}
   SVOK=$?
   if [ "$SVOK" = "0" ] ; then
     break
@@ -91,7 +84,7 @@ done
 
 if [ "$SVOK" != "0" ] ; then
   echo " failed :-("
-  echo "We're really sorry; this shouldn't have happened - please contact $SERVERADMIN for help. Thanks a lot!"
+  echo "We're really sorry; this shouldn't have happened - please contact hallo@uberspace.de for help. Thanks a lot!"
   exit 4
 fi
 
@@ -99,5 +92,5 @@ echo " started!"
 
 # final information
 echo
-echo "Congratulations - your personal ~/.service directory is now ready to use!"
+echo "Congratulations - your personal ~/service directory is now ready to use!"
 echo

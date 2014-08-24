@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 ########################################################################
 #
 # 2010-10-01
@@ -70,11 +70,11 @@ then
 fi
 
 ## check if config already exist
-if [ -e "/etc/apache2/vhosts.d/virtual6.${USERNAME}.conf" ]; then
+if [ -e "/etc/httpd/conf.d/virtual6.${USERNAME}.conf" ]; then
         echo -e "IPv6 configuration virtual6.${USERNAME}.conf already exists for this account.";
         exit 1;
 fi
-if [ -e "/etc/apache2/vhosts.d/ssl6.${USERNAME}.conf" ]; then
+if [ -e "/etc/httpd/conf.d/ssl6.${USERNAME}.conf" ]; then
         echo -e "IPv6 configuration ssl6.${USERNAME}.conf already exists for this account.";
         exit 1;
 fi
@@ -116,7 +116,7 @@ SuexecUserGroup ${USERNAME} ${USERNAME}
 DocumentRoot /var/www/virtual/${USERNAME}/html
 ScriptAlias /cgi-bin /var/www/virtual/${USERNAME}/cgi-bin
 ScriptAlias /fcgi-bin /var/www/virtual/${USERNAME}/fcgi-bin
-Include /etc/apache2/misc-conf.d/dyncontent
+Include /etc/httpd/conf/dyncontent.conf
 
 RewriteEngine On
 
@@ -130,8 +130,11 @@ RewriteRule (.*) /var/www/virtual/${USERNAME}/%{HTTP_HOST}/\$1
 
 </VirtualHost>
 EOF
-} > /etc/apache2/vhosts.d/virtual6.${USERNAME}.conf
-chmod 640 /etc/apache2/vhosts.d/virtual6.${USERNAME}.conf;
+} > /etc/httpd/conf.d/virtual6.${USERNAME}.conf
+chmod 640 /etc/httpd/conf.d/virtual6.${USERNAME}.conf;
+
+# check if pound is used
+if ! [ "$SSLFRONTEND" == "pound" ]; then
 
 {
 cat <<EOF
@@ -143,8 +146,8 @@ SuexecUserGroup ${USERNAME} ${USERNAME}
 DocumentRoot /var/www/virtual/${USERNAME}/html
 ScriptAlias /cgi-bin /var/www/virtual/${USERNAME}/cgi-bin
 ScriptAlias /fcgi-bin /var/www/virtual/${USERNAME}/fcgi-bin
-Include /etc/apache2/misc-conf.d/ssl-uberspace.conf
-Include /etc/apache2/misc-conf.d/dyncontent.conf
+Include /etc/httpd/conf/ssl-uberspace.conf
+Include /etc/httpd/conf/dyncontent.conf
 
 RewriteEngine On
 
@@ -153,14 +156,18 @@ RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
 
 </VirtualHost>
 EOF
-} > /etc/apache2/vhosts.d/ssl6.${USERNAME}.conf
-chmod 640 /etc/apache2/vhosts.d/ssl6.${USERNAME}.conf;
+} > /etc/httpd/conf.d/ssl6.${USERNAME}.conf
+chmod 640 /etc/httpd/conf.d/ssl6.${USERNAME}.conf;
+
+# check if pound is used (end)
+fi
+
 
 ## this triggers a script that will restart httpd within the next five minutes
 touch /root/please_restart_httpd;
 
 ## find out wether this user already has additional domains and configure them for IPv6
-DOMAINS=`grep -e "^ServerAlias " /etc/apache2/vhosts.d/virtual.${USERNAME}.conf | cut -d " " -f 2`;
+DOMAINS=`grep -e "^ServerAlias " /etc/httpd/conf.d/virtual.${USERNAME}.conf | cut -d " " -f 2`;
 for DOMAIN in $DOMAINS; do
     /usr/local/sbin/uberspace-account-add-domain6.sh -u ${USERNAME} -d ${DOMAIN} -i ${HOSTIP6}; 
 done

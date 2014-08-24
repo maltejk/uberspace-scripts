@@ -157,7 +157,12 @@ while (<VD>) {
     # this is a special mapping of a virtual domain to an extension namespace
     $systemuser = $1;
     my $extension = $2;
-    if ($systemusers{$systemuser}{dotqmail}{$extension . '-default'}) {
+
+    if ($systemusers{$systemuser}{catchall}) {
+      # the system user has a .qmail-default file without a vdeliver call,
+      # so let's add a catchall and ignore all other addresses as they're all valid
+      add_valid_rcpt('@' . $virtualdomain);
+    } elsif ($systemusers{$systemuser}{dotqmail}{$extension . '-default'}) {
       # this extension namespace has a catchall (~systemuser/.qmail-ext-default),
       # thus all addresses under that domain are valid
       # (namespace extensions can't contain a vdeliver call)
@@ -221,7 +226,7 @@ Returns a hash (address => 1) of addresses based on .qmail files in the given di
 
 sub get_dotqmail {
   my ($dir) = @_;
-  opendir (D, $dir);
+  opendir (D, $dir) or return ();
   my %dotqmail = map {
     $_ =~ s/^\.qmail-//;
     $_ =~ s/:/./g;

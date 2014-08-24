@@ -1,10 +1,6 @@
-#!/bin/bash
+#!/bin/sh
 ########################################################################
-#
-# 2011-12-10
-# Jonas Pasche
-# jpasche@jonaspasche.com
-#
+# 2014-07-03 Moritz Werner mwerner@jonaspasche.com
 ########################################################################
 #
 #	This program is free software: you can redistribute it and/or modify
@@ -14,253 +10,79 @@
 #
 #	This program is distributed in the hope that it will be useful,
 #	but WITHOUT ANY WARRANTY; without even the implied warranty of
-#	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 #	GNU General Public License for more details.
 #
 #	You should have received a copy of the GNU General Public License
-#	along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#	along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 ########################################################################
-#
-# This script will check if an account is over quota (or has been over
-# quota and isn't any more). In addition, it makes sure correct permissions
-# on each user's home directory.
-#
+# 2014-07-17 run checks as user
 ########################################################################
 
-# 2012-03-24 Jonas Pasche <jpasche@jonaspasche.com>
-# make sure all relevant permissions are still in place
+cd "$( dirname "${BASH_SOURCE[0]}" )"
 
-chmod -vc 700 /etc/httpd/conf.d
-chmod -vc 660 /var/log/wtmp
-chmod -vc 660 /var/run/utmp
-chmod -vc 600 /var/log/lastlog
-chmod -vc 700 /var/qmail/control/morercpthosts.d
-chmod -vc 600 /var/qmail/control/morercpthosts
-chmod -vc 700 /var/qmail/control/virtualdomains.d
-chmod -vc 600 /var/qmail/control/virtualdomains
-chmod -vc 6755 /usr/bin/checkvpw
-chmod -vc 440 /etc/shadow
-chmod -vc 600 /etc/pki/tls/private/*.key
-chmod -vc 600 /etc/pki/tls/private/*.pem
-
-echo "`basename $0` funktioniert noch nicht"
-exit 0
-
-function mail_diskusage () {
-
-  cat >> ${MAILFILE} << __EOF__
-
-Damit du weißt, wie sich die Belegung des Speicherplatzes so verteilt,
-haben wir dir hier die von dir genutzten Verzeichnisse zusammengestellt:
-__EOF__
-
-
-  for DIR in $UBERHOME /var/www/virtual/${UBERUSER} /var/lib/mysql/${UBERUSER} /var/lib/mysql/${UBERUSER}_* ; do
-    if [ -d $DIR ] ; then
-      echo >> ${MAILFILE}
-      du -h --max-depth=1 $DIR >> ${MAILFILE}
-    fi
-  done
-
-}
-
-function mail_help () {
-
-  cat >> ${MAILFILE} << __EOF__
-
-Brauchst du Hilfe? Kein Problem: Antworte einfach auf diese Mail. Auch
-wenn jene - wie du dir vermutlich denken kannst - von einem automatisch
-laufenden Script verschickt wurde, so landet deine Antwort dennoch nicht
-im Nirvana, sondern bei unserem Team, das dir gerne persönlich hilft.
-__EOF__
-
-}
-
-function mail_footer () {
-
-  cat >> ${MAILFILE} << __EOF__
-
-Beste Grüße,
-
-Boni, Chris, Matt & Jonas
-von Uberspace.de
-__EOF__
-
-}
-
-function mail_quotawarn () {
-
-  cat > ${MAILFILE} << __EOF__
-Ahoi Ubernaut!
-
-Es wird leider etwas eng - der Speicherplatz, den wir dir für deinen
-Account eingeräumt haben (im Fachjargon »Quota« genannt), ist derzeit
-erschöpft.
-
-Wir unterbinden Schreibzugriffe zwar nicht sofort, sondern gewähren dir
-für maximal eine Woche eine Überschreitung um 10%. Du solltest diese
-Zeit aber bitte nutzen, wieder Platz zu schaffen, ansonsten werden in
-Kürze keine Schreibzugriffe mehr möglich sein - das bezieht sich sowohl
-auf deinen Maileingang als auch auf deine Datenbanken und eben auch auf
-sonst alles, was sich innerhalb deines Uberspaces befindet.
-__EOF__
-
-  mail_diskusage
-  mail_help
-  mail_footer
-
-}
-
-function mail_quotaremind () {
-
-  cat > ${MAILFILE} << __EOF__
-Ahoi Ubernaut!
-
-Wir hatten dich gestern bereits einmal darüber informiert, dass du den
-dir von uns bereitgestellten Speicherplatz voll ausgeschöpft hast. Wir
-wollten dich sicherheitshalber daran erinnern, dass du dich dringend
-darum kümmern solltest, wieder Platz zu schaffen, ansonsten werden in
-Kürze keine Schreibzugriffe mehr möglich sein - das bezieht sich sowohl
-auf deinen Maileingang als auch auf deine Datenbanken und eben auch auf
-sonst alles, was sich innerhalb deines Uberspaces befindet.
-__EOF__
-
-  mail_diskusage
-  mail_help
-  mail_footer
-
-}
-
-function mail_quotafine () {
-
-  cat > ${MAILFILE} << __EOF__
-Ahoi Ubernaut!
-
-Keine Sorge, es ist nichts passiert. Nachdem wir dich aber ja informiert
-hatten, dass dein Speicherplatz voll war, wollten wir nun auch noch kurz
-Bescheid geben, dass auch aus unserer Sicht nun alles wieder in bester
-Ordnung ist. Das war's auch schon - wir wünschen dir weiterhin viel Spaß
-mit deinem Uberspace!
-__EOF__
-
-  mail_footer
-
-}
-
-function mail_publichome () {
-
-  cat > ${MAILFILE} << __EOF__
-Ahoi Ubernaut!
-
-Wir haben soeben einen Fehler für dich korrigiert. Es geht um die Rechte
-deines Home-Verzeichnisses, die wir beim Anlegen eines Uberspaces auf
-den Modus 700 setzten. 700 stellt dabei die Zugriffsrechte für dich
-selbst (erste Ziffer), für deine Gruppe (zweite Ziffer) und für alle
-anderen (dritte Ziffer) dar, wobei die 7 "alle Rechte" bedeutet und die
-0 "keine Rechte". Eine andere Art, diese Rechte auszudrücken, wäre
-"rwx------", zu lesen in Dreiergruppen: Die 7 wird durch "rwx" (read,
-write, execute) ausgedrückt; die 0 entsprechend durch "---". 700 heißt
-also: Ausschließlich du selbst kannst in deinem Home-Verzeichnis lesen
-und schreiben, und so soll es ja auch sein.
-
-Als wir eben die Berechtigungen aller Home-Verzeichnisse kontrolliert
-haben, ist aufgefallen, dass die Rechte deines Home-Verzeichnisses vor
-wenigen Minuten wie folgt geändert wurden:
-
-[${UBERUSER}@`hostname --short` ~]$ ls -ld ${UBERHOME}
-${OLD_LS}
-
-Damit ist dein Home-Verzeichnis kurzzeitig für andere lesbar gewesen -
-was nicht gut ist, weil dort Konfigurationsdateien etc. liegen, die
-eigentlich privat sind. Es wird vermutlich keiner gemerkt haben, weil
-wir die Berechtigungen alle paar Minuten prüfen und sie wie gesagt
-sofort wieder korrigiert haben. Nun sieht es also wieder so aus:
-
-[${UBERUSER}@`hostname --short` ~]$ ls -ld ${UBERHOME}
-${NEW_LS}
-
-Da wir aber nicht genau wissen, was dazu geführt hat, dass die Rechte
-geändert wurden, wollen wir dich sicherheitshalber darüber informieren.
-Möglicherweise war es nur ein unbedachtes Versehen - dann weißt du jetzt
-zumindest, dass das keine so gute Idee war. Vielleicht hast du auch
-irgendetwas durchgeführt, bei dem die Änderung der Rechte unbeabsichtigt
-"einfach so passiert" ist. In diesem Fall wäre es klasse, wenn du kurz
-überlegst, was du in den letzten Minuten gemacht haben könntest, was
-hiermit in Zusammenhang stehen könnte. Wir würden uns freuen, wenn du
-uns deine Erkenntnisse diesbezüglich mitteilen könntest - vielleicht
-kannst du damit dazu beitragen, dass wir andere User vor einem ähnlichen
-Problem bewahren können.
-__EOF__
-
-  mail_help
-  mail_footer
-
-}
-
-# we only need a single mailfile
-MAILFILE=`mktemp /tmp/uberspace-account-healthcheck.XXXXXX`
-
-# argument for "mutt -c"
-CC=malte@maltejk.de
-
-# also used by mutt
+# mutt needs this
 export REPLYTO=hallo@uberspace.de
+export SENDMAIL="mutt -F /usr/local/sbin/mails/.muttrc"
 
+export HOSTNAME_SHORT=`hostname --short`
+
+######## FUNCTIONS
+
+checks_as_root(){
+  UBERUSER=$1
+  UBERHOME=$(eval echo ~${UBERUSER})
+  UBERWEB=$(echo /var/www/virtual/${UBERUSER})
+  MAILFILE=$(mktemp /tmp/uberspace-account-healthcheck.XXXXXX)
+
+  for f in ./mails/*; do source $f; done
+  
+  for f in ./checks/user_as_root/enabled/*; do source $f; done
+
+  rm -f ${MAILFILE}
+}
+
+checks_as_user(){
+  UBERUSER=$(whoami)
+  UBERHOME=$(eval echo ~${UBERUSER})
+  UBERWEB=$(echo /var/www/virtual/${UBERUSER})
+  MAILFILE=$(mktemp /tmp/uberspace-account-healthcheck.XXXXXX)
+
+  for f in ./mails/*; do source $f; done
+
+  for f in ./checks/user_as_user/enabled/*; do source $f; done
+
+  rm -f ${MAILFILE}
+}
+# export it, so it can be called by su
+export -f checks_as_user
+
+######## CHECKS
+
+#### Host checks
+for f in ./checks/host/enabled/*; do source $f; done
+
+#### User checks
 for CONF in `find /etc/httpd/conf.d -name "virtual.*.conf" -printf "%f\n"` ; do
-
   UBERUSER=`echo $CONF | sed 's/^virtual\.//; s/\.conf$//;'`
-  UBERHOME=`eval echo ~${UBERUSER}`
 
-  # quota checks
-
-  QUOTAWARNFILE=${UBERHOME}/.quotawarn
-  quota -g -l -q ${UBERUSER} > /dev/null
-  if [ "$?" = "0" ] ; then
-    # user is NOT over quota
-    if [ -f ${QUOTAWARNFILE} ] ; then
-      echo "${UBERUSER} is has been over quota, but everything's fine now; inform him"
-      mail_quotafine
-      mutt -c ${CC} -s "[notice] Dein Uberspace »${UBERUSER}« hat wieder Platz" ${UBERUSER} < $MAILFILE
-      rm -f ${QUOTAWARNFILE}
-    fi
-  else
-    # user is over quota
-    if [ -f ${QUOTAWARNFILE} ] ; then
-      # user has already been warned
-      OLDFILE=`find ${QUOTAWARNFILE} -mtime +1`
-      if [ "${OLDFILE}" = "" ] ; then
-        echo "${UBERUSER} is still over quota, but has been informed within the last 24 hours"
-      else
-        echo "${UBERUSER} is still over quota; remind him"
-        mail_quotaremind
-        mutt -c ${CC} -s "[critical] Dein Uberspace »${UBERUSER}« ist immer noch voll" ${UBERUSER} < $MAILFILE
-        touch ${QUOTAWARNFILE}
-      fi
-    else
-      # user has not been warned yet
-      echo "${UBERUSER} is now over quota; inform him"
-      mail_quotawarn
-      mutt -c ${CC} -s "[warning] Dein Uberspace »${UBERUSER}« ist voll" ${UBERUSER} < $MAILFILE
-      touch ${QUOTAWARNFILE}
-    fi
+  # on mixed hosts: make sure that only Uberspace.de users will be checked
+  if [ ! -e /var/qmail/control/virtualdomains.d/${UBERUSER}.${HOSTNAME_SHORT}.uberspace.de ] ; then
+    continue
   fi
 
-  # home permission check
-  OLD_LS=`ls -ld ${UBERHOME} | grep -v rwx------`
-  if [ "$OLD_LS" != "" ] ; then
-    echo "${UBERHOME} has wrong permissions; correcting"
-    chmod 700 ${UBERHOME}
-    NEW_LS=`ls -ld ${UBERHOME}`
-    mail_publichome
-    mutt -c ${CC} -s "[warning] Unsichere Rechte deines Home-Verzeichnisses »${UBERHOME}«" ${UBERUSER} < $MAILFILE
-  fi
 
-  # fix silently
-  if [ -f ${UBERHOME}/.my.cnf ] ; then
-    chmod 600 ${UBERHOME}/.my.cnf
+  OWNER=$(stat -c '%U' /home/${UBERUSER})
+
+  if [ "${OWNER}" != "root" ] ; then
+
+    # checks as user
+    su ${UBERUSER} -s /bin/bash -c 'checks_as_user'
+
+    # checks as root
+    checks_as_root $UBERUSER
   fi
 
 done
 
-rm -f ${MAILFILE}

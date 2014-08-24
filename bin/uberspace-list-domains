@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 ########################################################################
 #
 # 2012-02-01
@@ -26,8 +26,7 @@
 #
 ########################################################################
 
-if [ "${SUDO_USER}" != "$USER" ] ; then
-  echo "sudoing user is $SUDO_USER."
+if [ "${SUDO_USER}" = "" ] ; then
   exec sudo -n $0 $@
 fi
 
@@ -85,10 +84,7 @@ fi
 
 # apache
 if [ $WEBSERVERCONFIG ] ; then
-  DOMAINS=`grep -h ^ServerAlias /etc/apache2/sites-available/*.$SUDO_USER.conf | sed "s/ServerAlias //g;" | sed 's/^[ \t]*//;s/[ \t]*$//' | tr -cs 'a-zA-Z0-9*-.' '[\n*]' | sort | uniq`
-  for DOMAIN in $DOMAINS; do
-    echo $DOMAIN
-  done
+  grep -h ^ServerAlias /etc/httpd/conf.d/*.${SUDO_USER}.conf | sed "s/ServerAlias //g;" | sed 's/^[ \t]*//;s/[ \t]*$//' | tr -cs 'a-zA-Z0-9*-.' '[\n*]' | sort | uniq
 fi
 
 # qmail

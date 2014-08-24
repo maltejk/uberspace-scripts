@@ -1,24 +1,20 @@
-#!/bin/bash
+#!/bin/sh
+########################################################################
+# 2012-04-15 Christopher Hirschmann c.hirschmann@jonaspasche.com
 ########################################################################
 #
-# 2010-10-01
-# Christopher Hirschmann
-# c.hirschmann@jonaspasche.com
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
 #
-########################################################################
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
 #
-#	This program is free software: you can redistribute it and/or modify
-#	it under the terms of the GNU General Public License as published by
-#	the Free Software Foundation, either version 3 of the License, or
-#	(at your option) any later version.
-#
-#	This program is distributed in the hope that it will be useful,
-#	but WITHOUT ANY WARRANTY; without even the implied warranty of
-#	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#	GNU General Public License for more details.
-#
-#	You should have received a copy of the GNU General Public License
-#	along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 ########################################################################
 #
@@ -84,7 +80,13 @@ then
 	exit 2;
 fi
 
-VHOSTCONF="/etc/apache2/sites-available/virtual.${USERNAME}.conf";
+grep -qsE "^${USERNAME}" /etc/passwd;
+if [ "$?" == "1" ] ; then
+	echo -e "ERROR: Ein Benutzer dieses Namens existiert nicht (laut /etc/passwd).";
+	exit 1;
+fi
+
+VHOSTCONF="/etc/httpd/conf.d/virtual.${USERNAME}.conf";
 
 ## this includes host specific variables
 . /usr/local/sbin/uberspace-account-local-settings.sh;
@@ -95,7 +97,8 @@ if [ "`grep "ServerAlias ${DOMAIN} " $VHOSTCONF`" != "" ] ; then
 	exit 1;
 fi
 
-## add domain to VirtualHost
+## add domain to VirtualHosts
+## on CentOS 6, this will also add the domain to IPv6-VirtualHosts, because they too are defined in virtual.${USERNAME}.conf (on CentOS 6 we don't have virtual6.{USERNAME}.conf anymore)
 sed -i -e 's/^ServerName '"${USERNAME}"'.'"$HOSTNAME"'$/&\nServerAlias '"$DOMAIN"' *.'"$DOMAIN"'/' $VHOSTCONF;
 
 ## setup qmail
@@ -116,14 +119,14 @@ fi
 ## update the qmail configuration
 /usr/local/sbin/uberspace-update-qmail-config.sh
 
-## this will trigger a script that will restart qmail-send within the next five minutes
-touch /root/please_restart_qmail-send;
+## this will tell qmail-send to re-read it's config
+/command/svc -h /service/qmail-send;
 
 ## this triggers a script that will restart httpd within the next five minutes
 touch /root/please_restart_httpd;
 
-## if the following file exists, asume that IPv6 is enabled for that account and call uberspace-account-add-domain6.sh
-if [ -e /etc/apache2/sites-available/virtual6.${USERNAME}.conf ]; then
+## if the following file exists, this host should be a CentOS 5 Uberspace host (on CentOS 6 IPv6 isn't configured in separate files anymore), so call uberspace-account-add-domain6.sh
+if [ -e /etc/httpd/conf.d/virtual6.${USERNAME}.conf ]; then
 	/usr/local/sbin/uberspace-account-add-domain6.sh -u ${USERNAME} -d ${DOMAIN}
 fi
 

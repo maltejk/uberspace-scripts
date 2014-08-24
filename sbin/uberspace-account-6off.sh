@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 ########################################################################
 #
 # 2010-10-01
@@ -77,9 +77,13 @@ if [ ! -e /etc/httpd/conf.d/virtual6.${USERNAME}.conf ]; then
     echo "Error: /etc/httpd/conf.d/virtual6.${USERNAME}.conf doesn't exist.";
     exit 1;
 fi
-if [ ! -e /etc/httpd/conf.d/ssl6.${USERNAME}.conf ]; then
-    echo "Error: /etc/httpd/conf.d/ssl6.${USERNAME}.conf doesn't exist.";
-    exit 1;
+
+# check if pound is used
+if ! [ "`grep SSLFRONTEND=pound /usr/local/sbin/uberspace-account-local-settings.sh`" ]; then
+  if [ ! -e /etc/httpd/conf.d/ssl6.${USERNAME}.conf ]; then
+      echo "Error: /etc/httpd/conf.d/ssl6.${USERNAME}.conf doesn't exist.";
+      exit 1;
+  fi
 fi
 
 ## determine which IPv6 address was assigned to this user
@@ -96,8 +100,8 @@ sed -i -e 's/^\('"$BURNEDADDRESS"'\) '"${USERNAME}"'$/& deallocated/' ${POOL};
 
 ## remove all IPv6-related apache configs
 rm -f /etc/httpd/conf.d/xaliasdomain6.${USERNAME}-*.conf;
-rm -f /etc/httpd/conf.d/ssl6.${USERNAME}.conf;
 rm -f /etc/httpd/conf.d/virtual6.${USERNAME}.conf;
+rm -f /etc/httpd/conf.d/ssl6.${USERNAME}.conf;
 
 ## this triggers a script that will restart httpd within the next five minutes
 touch /root/please_restart_httpd;

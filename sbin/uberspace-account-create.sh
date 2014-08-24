@@ -1,32 +1,30 @@
-#!/bin/bash
+#!/bin/sh
+########################################################################
+# 2014-07-27 Christopher Hirschmann c.hirschmann@jonaspasche.com
 ########################################################################
 #
-# 2010-10-01
-# Christopher Hirschmann
-# c.hirschmann@jonaspasche.com
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
 #
-########################################################################
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
 #
-#	This program is free software: you can redistribute it and/or modify
-#	it under the terms of the GNU General Public License as published by
-#	the Free Software Foundation, either version 3 of the License, or
-#	(at your option) any later version.
-#
-#	This program is distributed in the hope that it will be useful,
-#	but WITHOUT ANY WARRANTY; without even the implied warranty of
-#	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#	GNU General Public License for more details.
-#
-#	You should have received a copy of the GNU General Public License
-#	along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 ########################################################################
 #
 # This script will create an uberspace account. It adds a system user,
-# disables ftp login for that user, sets the quota, installs a SSH
-# public key if one is supplied, generates a password for the user if no
-# SSH public key is supplied, generates a MySQL password (no matter what),
-# it will setup qmail / vmailmgr, and configure the apache webserver.
+# sets the group quota, installs a SSH public key if one is supplied,
+# configures the apache webserver (both for IPv4 and IPv6), generates
+# a MySQL password and it will setup qmail / vmailmgr.
+# A SSH password is generated if no SSH public key is supplied.
+# The unique IPv6 address that is assigned to the account is echoed at
+# the end.
 #
 # Usage:
 # -h	help message
@@ -39,8 +37,7 @@
 #
 ########################################################################
 
-source  /usr/local/sbin/uberspace-account-common
-source  /usr/local/sbin/uberspace-account-local-settings.sh
+source /usr/local/sbin/uberspace-account-common
 
 checkforrootprivs;
 
@@ -53,7 +50,8 @@ then
 fi
 
 ## Parse arguments
-while getopts ":hu:k:" Option; do
+while getopts ":hu:k:" Option;
+do
 	case $Option in
 		h	)
 				printf "$USAGE" $(basename $0);
@@ -90,63 +88,121 @@ fi
 ## this includes host specific variables
 . /usr/local/sbin/uberspace-account-local-settings.sh;
 
-if [ "`grep ^${USERNAME}: /etc/passwd`" != "" ] ; then
+if [ "`grep ^${USERNAME}: /etc/passwd`" != "" ] ;
+then
 	echo -e "Ein Benutzer dieses Namens existiert bereits (passwd)";
 	exit 1;
 fi
 
-if [ -e /home/${USERNAME} ] ; then
+if [ -e /home/${USERNAME} ] ;
+then
 	echo -e "Ein Benutzer dieses Namens existiert bereits (home)";
 	exit 1;
 fi
 
-if [ "`grep ^${USERNAME}: /etc/group`" != "" ] ; then
+if [ "`grep ^${USERNAME}: /etc/group`" != "" ] ;
+then
 	echo -e "Eine Gruppe dieses Namens existiert bereits";
 	exit 1;
 fi
 
-## add system account, group with same name, create ~, 
-useradd -U -m -s /bin/bash ${USERNAME};
+# get IPv6 address from pool
+FREEADDRESS=`grep -e " free$" ${POOL} | head -n 1 | cut -d " " -f 1`;
+
+# mark address as used
+sed -i -e 's/^\('"$FREEADDRESS"'\) free$/\1 '"${USERNAME}"'/' ${POOL};
+
+HOSTIP6=${FREEADDRESS};
+
+if [ "${HOSTIP6}" == "" ];
+then
+	echo -e "Could not get an IPv6 address.";
+	exit 1;
+fi
+
+## add system account
+/usr/sbin/useradd ${USERNAME};
+
+mkdir -p /readonly/${USERNAME}
+chown root:${USERNAME} /readonly/${USERNAME}
+chmod 750 /readonly/${USERNAME}
+
+## on helium.uberspace.de we had vsftpd installed, but didn't use it for uberspace
+## on all newer uberspace hosts vsftpd may have been installed, but was never used
+if [ "${HOSTNAME}" == "helium.uberspace.de" ];
+then
+	addtoftpusers;
+	addtoftpuser_list;
+fi
 
 ## set quota
-setquota -g ${USERNAME} 1024000 1126400 0 0 /;
-#setquota -g ${USERNAME} 10485760 11534336 0 0 /;
+/usr/sbin/setquota -g ${USERNAME} 10485760 11534336 0 0 /;
+
+if ! [ "`df | grep /mnt/non_drbd`" = "" ] ;
+then
+	/usr/sbin/setquota -g ${USERNAME} 204800 225280 25000 25000 /mnt/non_drbd/;
+fi
+
 
 ## if SSH public key was supplied, install it
-if [ "${SSHPUBKEYGIVEN}" ] ; then
+if [ "${SSHPUBKEYGIVEN}" ] ;
+then
 	mkdir -p -m 0700 /home/${USERNAME}/.ssh/;
 	echo ${SSHPUBKEY} > /home/${USERNAME}/.ssh/authorized_keys;
 	chmod 0600 /home/${USERNAME}/.ssh/authorized_keys;
+	echo ${SSHPUBKEY} > /home/${USERNAME}/.ssh/authorized_keys2;
+	chmod 0600 /home/${USERNAME}/.ssh/authorized_keys2;
 	chown -R ${USERNAME}:${USERNAME} /home/${USERNAME};
+	chattr +i /home/${USERNAME}/.ssh/authorized_keys2;
 	echo -e "Installed SSH public key.";
 else
 ## if no SSH public key was supplied, generate and set password
-	PASS=`apg -a 1 -M ncl -E \|1Il0O -n 1 -m 10 -x 10 -q -d 2>&1| sed "s/ .*//;"`;
-	usermod --password "`echo $PASS | mkpasswd --stdin`" ${USERNAME}
-## save user's password to file.
-	echo "Your password is $PASS" > /home/${USERNAME}/your_password.txt
-	chown ${USERNAME}:${USERNAME} /home/${USERNAME}/your_password.txt; 
-	chmod 600 /home/${USERNAME}/your_password.txt
+	PASS=`/usr/bin/apg -M ncl -E \|1Il0O -r /usr/share/dict/words -n 1 -m 6 -x 10 -q -d 2>&1| sed "s/ .*//;"`;
+	echo $PASS | /usr/bin/passwd --stdin ${USERNAME} 2>&1 | grep -v "Changing password for user" | grep -v "passwd: all authentication tokens updated successfully";
 fi
 
 ## generate password for MySQL in any case
-MYSQLPASS=`/usr/bin/apg -a 1 -M ncl -E \|1Il0O -n 1 -m 20 -x 20 -q -d 2>&1| sed "s/ .*//;"`;
+MYSQLPASS=`/usr/bin/apg -M ncl -E \|1Il0O -r /usr/share/dict/words -n 1 -m 12 -x 20 -q -d 2>&1| sed "s/ .*//;"`;
+
+# create own ~/etc for every user
+mkdir -m 0700 /home/${USERNAME}/etc
+chown ${USERNAME}:${USERNAME} /home/${USERNAME}/etc
+
+# create own TMPDIR for every user
+mkdir -m 0700 /home/${USERNAME}/tmp
+chown ${USERNAME}:${USERNAME} /home/${USERNAME}/tmp
+
+# create logrotate configuration (logrotate runs as root)
+mkdir -p /readonly/${USERNAME}/etc
+chown root:${USERNAME} /readonly/${USERNAME}/etc
+chmod 750 /readonly/${USERNAME}/etc
+cat > /readonly/${USERNAME}/etc/logrotate.conf <<__EOF__
+/readonly/${USERNAME}/logs/*_log {
+  rotate 4
+  weekly
+  compress
+}
+__EOF__
+chmod 640 /readonly/${USERNAME}/etc/logrotate.conf
+chown root:${USERNAME} /readonly/${USERNAME}/etc/logrotate.conf
+
+# convenience symlink to ~/etc
+pushd /home/${USERNAME}/etc
+ln -s ../../../readonly/${USERNAME}/etc/logrotate.conf logrotate.conf
+popd
 
 ## setup qmail
-if [ ! -d /home/${USERNAME}/Maildir ]; then
+if [ ! -d /home/${USERNAME}/Maildir ];
+then
 	/var/qmail/bin/maildirmake /home/${USERNAME}/Maildir;
 	chown -R ${USERNAME}:${USERNAME} /home/${USERNAME}/Maildir;
 fi
 
-if [ ! -d /var/qmail/control/morercpthosts.d ]; then
-	mkdir /var/qmail/control/morercpthosts.d;
-fi
 touch /var/qmail/control/morercpthosts.d/${USERNAME}.${HOSTNAME};
+chown ${USERNAME} /var/qmail/control/morercpthosts.d/${USERNAME}.${HOSTNAME};
 
-if [ ! -d /var/qmail/control/virtualdomains.d ]; then
-	mkdir /var/qmail/control/virtualdomains.d;
-fi
 echo ${USERNAME} > /var/qmail/control/virtualdomains.d/${USERNAME}.${HOSTNAME};
+chown ${USERNAME} /var/qmail/control/virtualdomains.d/${USERNAME}.${HOSTNAME};
 
 ## update qmail configuration
 /usr/local/sbin/uberspace-update-qmail-config.sh
@@ -157,48 +213,50 @@ echo ${USERNAME}          > /home/${USERNAME}/.qmail-hostmaster
 echo ${USERNAME}          > /home/${USERNAME}/.qmail-abuse
 chown -R ${USERNAME}:${USERNAME} /home/${USERNAME}/.qmail-*
 
-## this will trigger a script that will restart qmail-send within the next five minutes
-touch /root/please_restart_qmail-send;
+## this will tell qmail-send to re-read it's config
+/command/svc -h /service/qmail-send;
 
 ## prepare apache vhost
 
-mkdir -m 0750 /var/www/virtual/${USERNAME};
-chown ${USERNAME}:www-data /var/www/virtual/${USERNAME};
+mkdir -p -m 0750 /var/www/virtual/${USERNAME};
+chown ${USERNAME}:apache /var/www/virtual/${USERNAME};
 
-mkdir -m 0755 /var/www/virtual/${USERNAME}/html;
+mkdir -p -m 0755 /var/www/virtual/${USERNAME}/html;
 chown ${USERNAME}:${USERNAME} /var/www/virtual/${USERNAME}/html;
 
-mkdir -m 0755 /var/www/virtual/${USERNAME}/cgi-bin;
+mkdir -p -m 0755 /var/www/virtual/${USERNAME}/cgi-bin;
 chown ${USERNAME}:${USERNAME} /var/www/virtual/${USERNAME}/cgi-bin;
 
-mkdir -m 0755 /var/www/virtual/${USERNAME}/fcgi-bin;
+mkdir -p -m 0755 /var/www/virtual/${USERNAME}/fcgi-bin;
 chown ${USERNAME}:${USERNAME} /var/www/virtual/${USERNAME}/fcgi-bin;
 
-mkdir -m 0750 /var/www/virtual/${USERNAME}/logs;
-chgrp ${USERNAME} /var/www/virtual/${USERNAME}/logs;
+mkdir -p -m 0750 /readonly/${USERNAME}/logs;
+chgrp ${USERNAME} /readonly/${USERNAME}/logs;
+pushd /var/www/virtual/${USERNAME}
+ln -s ../../../../readonly/${USERNAME}/logs logs
+popd
 
 ln -s /var/www/virtual/${USERNAME}/* /home/${USERNAME};
 
-mkdir -m 0700 /home/${USERNAME}/.etc;
-chown ${USERNAME}:${USERNAME} /home/${USERNAME}/.etc;
-
 {
 cat <<EOF
-## `date +%Y-%m-%d` $0 
-PHPVERSION=5
+## `date +%Y-%m-%d` $0
+PHPVERSION=$DEFAULTPHP
 EOF
-} > /home/${USERNAME}/.etc/phpversion;
-chown ${USERNAME}.${USERNAME} /home/${USERNAME}/.etc/phpversion;
-chmod 0664 /home/${USERNAME}/.etc/phpversion;
+} > /home/${USERNAME}/etc/phpversion;
+chown ${USERNAME}.${USERNAME} /home/${USERNAME}/etc/phpversion;
+chmod 0664 /home/${USERNAME}/etc/phpversion;
 
 {
 cat <<EOF
-#!/bin/bash
-## `date +%Y-%m-%d` $0 
-. ~/.etc/phpversion
-export PHPRC="/home/${USERNAME}/.etc"
-#exec /package/host/localhost/php-\${PHPVERSION}/bin/php-cgi
-exec /usr/bin/php-cgi
+#!/bin/sh
+## `date +%Y-%m-%d` $0
+. ~/etc/phpversion
+export PHPRC="/home/${USERNAME}/etc"
+export USER="${USERNAME}"
+export HOME="/home/${USERNAME}"
+export TMPDIR="/home/${USERNAME}/tmp"
+exec /package/host/localhost/php-\${PHPVERSION}/bin/php-cgi
 EOF
 } > /var/www/virtual/${USERNAME}/fcgi-bin/php-fcgi-starter;
 
@@ -208,19 +266,21 @@ chmod 755 /var/www/virtual/${USERNAME}/fcgi-bin/php-fcgi-starter;
 {
 cat <<EOF
 ## `date +%Y-%m-%d` $0 $@
+
 <Directory /var/www/virtual/${USERNAME}>
-AllowOverride All
+AllowOverride AuthConfig FileInfo Indexes Limit Options=ExecCGI,Includes,Indexes,MultiViews,SymLinksIfOwnerMatch
 Options +Includes
 </Directory>
 
-<VirtualHost ${HOSTIP}:80>
+<VirtualHost ${HOSTIP}:81>
 ServerName ${USERNAME}.${HOSTNAME}
+ServerAlias *.${USERNAME}.${HOSTNAME}
 ServerAdmin $SERVERADMIN
 SuexecUserGroup ${USERNAME} ${USERNAME}
 DocumentRoot /var/www/virtual/${USERNAME}/html
 ScriptAlias /cgi-bin /var/www/virtual/${USERNAME}/cgi-bin
 ScriptAlias /fcgi-bin /var/www/virtual/${USERNAME}/fcgi-bin
-Include /etc/apache2/dyncontent
+Include /etc/httpd/conf/dyncontent.conf
 
 RewriteEngine On
 
@@ -234,11 +294,12 @@ RewriteRule (.*) /var/www/virtual/${USERNAME}/%{HTTP_HOST}/\$1
 
 </VirtualHost>
 EOF
-} > /etc/apache2/sites-available/virtual.${USERNAME}.conf
-chmod 640 /etc/apache2/sites-available/virtual.${USERNAME}.conf;
+} > /etc/httpd/conf.d/virtual.${USERNAME}.conf
+chmod 640 /etc/httpd/conf.d/virtual.${USERNAME}.conf;
 
-# enable vhost
-a2ensite virtual.${USERNAME}.conf
+# check if pound is used
+if ! [ "$SSLFRONTEND" == "pound" ];
+then
 
 {
 cat <<EOF
@@ -250,8 +311,8 @@ SuexecUserGroup ${USERNAME} ${USERNAME}
 DocumentRoot /var/www/virtual/${USERNAME}/html
 ScriptAlias /cgi-bin /var/www/virtual/${USERNAME}/cgi-bin
 ScriptAlias /fcgi-bin /var/www/virtual/${USERNAME}/fcgi-bin
-Include /etc/apache2/ssl-uberspace
-Include /etc/apache2/dyncontent
+Include /etc/httpd/conf/ssl-uberspace.conf
+Include /etc/httpd/conf/dyncontent.conf
 
 RewriteEngine On
 
@@ -260,34 +321,22 @@ RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
 
 </VirtualHost>
 EOF
-} > /etc/apache2/sites-available/ssl.${USERNAME}.conf
-chmod 640 /etc/apache2/sites-available/ssl.${USERNAME}.conf;
+} > /etc/httpd/conf.d/ssl.${USERNAME}.conf
+chmod 640 /etc/httpd/conf.d/ssl.${USERNAME}.conf;
 
-# enable ssl vhost. not nao, we have no ssl cert.
-#a2ensite ssl.${USERNAME}.conf
+# check if pound is used (end)
+fi
 
 ## this triggers a script that will restart httpd within the next five minutes
 touch /root/please_restart_httpd;
 
-# no setup IPv6
-#/usr/local/sbin/uberspace-account-6on.sh -u ${USERNAME}
-
-## we need to return the ipv6-address 
-#POOL="/etc/ipv6-address-pool/index.txt";
-#BURNEDADDRESS=`grep -e " ${USERNAME}$" ${POOL} | cut -d " " -f 1`;
-
-#if [ "$BURNEDADDRESS" == "" ]; then
-#  echo -e "OK $PASS";
-#else 
-#  echo -e "OK $BURNEDADDRESS $PASS";
-#fi
-
-## create user account and database in MySQL 
+## create user account and database in MySQL
 mysql -u root -e "CREATE DATABASE \`${USERNAME}\`;";
 mysql -u root -e "GRANT ALL PRIVILEGES ON \`${USERNAME}\`.* TO \`${USERNAME}\`@\`localhost\` IDENTIFIED BY '$MYSQLPASS';";
-mysql -u root -e "GRANT ALL PRIVILEGES ON \`${USERNAME}\`.* TO \`${USERNAME}\`@\`127.0.0.1\` IDENTIFIED BY '$MYSQLPASS';";
 mysql -u root -e "GRANT ALL PRIVILEGES ON \`${USERNAME}\_%\`.* TO \`${USERNAME}\`@\`localhost\` IDENTIFIED BY '$MYSQLPASS';";
-mysql -u root -e "GRANT ALL PRIVILEGES ON \`${USERNAME}\_%\`.* TO \`${USERNAME}\`@\`127.0.0.1\` IDENTIFIED BY '$MYSQLPASS';";
+mysql -u root -e "GRANT USAGE ON *.* TO \`${USERNAME}\`@\`localhost\` WITH MAX_USER_CONNECTIONS 20;";
+
+# additional databases can be added (and removed) with uberspace-account-userdb-[create|delete]
 
 chgrp ${USERNAME} /var/lib/mysql/${USERNAME};
 chmod g+s /var/lib/mysql/${USERNAME};
@@ -296,17 +345,32 @@ chmod g+s /var/lib/mysql/${USERNAME};
 cat <<EOF
 ## `date +%Y-%m-%d` $0 $@
 [client]
-# Do NOT change your password here! It is meant to *access* your MySQL databases,
-# not to *set* the password. 
-password=${MYSQLPASS}
+
+# Moechtest du dein Passwort aendern, so kannst du das mit dem Befehl
+#
+#   SET PASSWORD = PASSWORD("...");
+#
+# auf der MySQL-Shell tun. Anschliessend kannst du es auch hier anpassen.
+#
+# Beachte, dass dies die Konfigurationsdatei des MySQL-Clients ist, nicht
+# die des MySQL-Servers - das Passwort wird hier gefuehrt, damit du dich
+# ohne manuelle Eingabe mit dem Server verbinden kannst. Du kannst es
+# hierueber aber nicht *setzen*; das muss eben mit SET PASSWORD geschehen.
+#
+# Mehr dazu findest du hier:
+#
+# https://uberspace.de/dokuwiki/database:mysql#passwort_aendern
+
+password=${MYSQLPASS} # NICHT ÄNDERN, ohne den obigen Text zu lesen!
 port=3306
 user=${USERNAME}
-socket=/var/run/mysqld/mysqld.sock
+socket=/var/lib/mysql/mysql.sock
 EOF
 } > /home/${USERNAME}/.my.cnf;
 chmod 0600 /home/${USERNAME}/.my.cnf;
 chown ${USERNAME}:${USERNAME} /home/${USERNAME}/.my.cnf;
 
-echo -e "Hello.\nThis is ${0} on ${HOSTNAME}.\nI've just created a new uberspace account named ${USERNAME}.\nRegards,\n${0}" | mail -s "uberspace account created" $SERVERADMIN;
+## we need to return the ipv6-address
+echo -e "OK $HOSTIP6 $PASS";
 
-exit 0;
+echo -e "Hello.\nThis is ${0} on ${HOSTNAME}.\nI've just created a new uberspace account named ${USERNAME}.\nRegards,\n${0}" | mail -s "uberspace account created" mail@jonaspasche.com;

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 ########################################################################
 #
 # 2011-12-20
@@ -69,18 +69,21 @@ then
 	exit 2;
 fi
 
-for CONF in /etc/apache2/sites-available/*.${USERNAME}.conf ; do
+for CONF in /etc/httpd/conf.d/*.${USERNAME}.conf ; do
   grep -q ^ErrorLog $CONF
   if [ "$?" = "0" ] ; then
     echo "$CONF already has an error_log"
   else
     echo "changing $CONF";
-    sed -i -e "s/^Include \/etc\/apache2\/dyncontent.conf/&\nErrorLog \/var\/www\/virtual\/${USERNAME}\/logs\/error_log/" ${CONF}
+    sed -i -e "s/^Include \/etc\/httpd\/conf\/dyncontent.conf/&\nErrorLog \/readonly\/${USERNAME}\/logs\/error_log/" ${CONF}
     ## this triggers a script that will restart httpd within the next five minutes
     touch /root/please_restart_httpd;
   fi
 done
 
-sed -i -e 's/access_log/*_log/;' /home/${USERNAME}/.etc/logrotate.conf
+# old versions if this file are possibly immutable, but this is
+# no longer needed due to the move to /readonly
+chattr -i /readonly/${USERNAME}/etc/logrotate.conf
+sed -i -e 's/access_log/*_log/;' /readonly/${USERNAME}/etc/logrotate.conf
 
 echo -e "OK Alles erledigt"

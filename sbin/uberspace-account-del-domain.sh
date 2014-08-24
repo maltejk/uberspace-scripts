@@ -1,24 +1,20 @@
-#!/bin/bash
+#!/bin/sh
+########################################################################
+# 2012-04-15 Christopher Hirschmann c.hirschmann@jonaspasche.com
 ########################################################################
 #
-# 2010-10-01
-# Christopher Hirschmann
-# c.hirschmann@jonaspasche.com
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
 #
-########################################################################
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
 #
-#	This program is free software: you can redistribute it and/or modify
-#	it under the terms of the GNU General Public License as published by
-#	the Free Software Foundation, either version 3 of the License, or
-#	(at your option) any later version.
-#
-#	This program is distributed in the hope that it will be useful,
-#	but WITHOUT ANY WARRANTY; without even the implied warranty of
-#	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#	GNU General Public License for more details.
-#
-#	You should have received a copy of the GNU General Public License
-#	along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 ########################################################################
 #
@@ -79,10 +75,11 @@ then
 	exit 2;
 fi
 
-VHOSTCONF="/etc/apache2/sites-available/virtual.${USERNAME}.conf";
-DOMCONF="/etc/apache2/sites-available/xaliasdomain.${USERNAME}-$DOMAIN.conf";
+VHOSTCONF="/etc/httpd/conf.d/virtual.${USERNAME}.conf";
+DOMCONF="/etc/httpd/conf.d/xaliasdomain.${USERNAME}-$DOMAIN.conf";
 
 ## remove domain from VirtualHost (supporting both the old "www.$DOMAIN" and the new "*.$DOMAIN" syntax
+## FIXME: check if this works with CentOS 6 Uberspace Hosts and their single config for IPv4 and IPv6
 grep -qe "^ServerAlias $DOMAIN " $VHOSTCONF && sed -i -e '/^ServerAlias '"$DOMAIN"' .*/d' $VHOSTCONF || notinconfig
 
 ## remove domain specific config
@@ -102,14 +99,14 @@ fi
 ## update the qmail configuration
 /usr/local/sbin/uberspace-update-qmail-config.sh
 
-## this will trigger a script that will restart qmail-send within the next five minutes
-touch /root/please_restart_qmail-send;
+## this will tell qmail-send to re-read it's config
+/command/svc -h /service/qmail-send;
 
 ## this triggers a script that will restart httpd within the next five minutes
 touch /root/please_restart_httpd;
 
-## if the following file exists, asume that IPv6 is enabled for that account and call uberspace-account-del-domain6.sh
-if [ -e /etc/apache2/sites-available/virtual6.${USERNAME}.conf ]; then
+## if the following file exists, this host should be a CentOS 5 Uberspace host (on CentOS 6 IPv6 isn't configured in separate files anymore), so call uberspace-account-del-domain6.sh
+if [ -e /etc/httpd/conf.d/virtual6.${USERNAME}.conf ]; then
 	/usr/local/sbin/uberspace-account-del-domain6.sh -u ${USERNAME} -d ${DOMAIN}
 fi
 

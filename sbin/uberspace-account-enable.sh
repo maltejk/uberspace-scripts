@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 ########################################################################
 #
 # 2011-21-21
@@ -22,7 +22,7 @@
 #
 ########################################################################
 #
-# This script will enable an Uberspace (http only).
+# This script will enable an Uberspace.
 #
 ########################################################################
 
@@ -69,29 +69,51 @@ then
 	exit 2;
 fi
 
-VHOSTCONF="/etc/httpd/conf.d/virtual.${USERNAME}.conf";
 
-VHOSTCOUNT=`grep -c "^<VirtualHost" $VHOSTCONF`
-VHOSTDISABLED=`sed -n '/^DocumentRoot/{n;p;}' $VHOSTCONF | grep -c "Include /etc/httpd/conf/uberspace-disabled.conf"`
-if [ $VHOSTDISABLED = $VHOSTCOUNT ] ; then
-  perl -pi -e "s/^Include \/etc\/httpd\/conf\/uberspace-disabled.conf\n//g" $VHOSTCONF;
-  ## this triggers a script that will restart httpd within the next five minutes
-  touch /root/please_restart_httpd;
-  echo -e "OK Alles erledigt"
-  exit 0;
-elif [ $VHOSTDISABLED = 0 ] ; then
-  echo -e "OK Uberspace ist derzeit aktiv"
-  exit 0;
+USERHOME="/home/${USERNAME}";
+USERWEBHOME="/var/www/virtual/${USERNAME}";
+
+if (`test -d ${USERHOME}` && `test -d ${USERWEBHOME}`) ; then
+  ENABLED=
+
+  # cron
+  if (`test -e ${USERHOME}/.crontab-disabled`) ; then
+    crontab -u ${USERNAME} ${USERHOME}/.crontab-disabled
+  fi
+  
+  # homedir
+  if [ "`stat --printf=%U ${USERHOME}`" = "root" ] ; then
+    chown ${USERNAME}.${USERNAME} ${USERHOME}
+  else
+    ENABLED=1
+  fi
+  chmod 700 ${USERHOME}
+
+  # webdir
+  if [ "`stat --printf=%U ${USERWEBHOME}`" = "root" ] ; then
+    chown ${USERNAME}.apache ${USERWEBHOME}
+  else
+    ENABLED=1
+  fi
+  chmod 750 ${USERWEBHOME}
+
+  # ~/service
+  if (`test -d /etc/run-svscan-${USERNAME}`) ; then
+    if (`test -e /etc/run-svscan-${USERNAME}/down`) ; then
+      rm -f /etc/run-svscan-${USERNAME}/down
+    fi
+    /usr/local/bin/svc -u /service/svscan-${USERNAME}
+  fi
+
+  if [ $ENABLED ] ; then
+    echo -e "OK Uberspace ist bereits aktiv"
+    exit 0;
+  else
+    echo -e "OK Uberspace ist aktiviert"
+    exit 0;
+  fi
 else
-  perl -pi -e "s/^Include \/etc\/httpd\/conf\/uberspace-disabled.conf\n//g;" $VHOSTCONF;
-  echo -e "OK Alles erledigt (gefundene VirtualHosts: $VHOSTCOUNT, davon waren deaktiviert: $VHOSTDISABLED)"
-  ## this triggers a script that will restart httpd within the next five minutes
-  touch /root/please_restart_httpd;
-  exit 0;
+  echo "No userdir ${USERHOME} or userwebdir ${USERWEBHOME} found!"
+  exit 2;
 fi
-
-## if the following file exists, asume that IPv6 is enabled for that account and call uberspace-account-add-domain6.sh
-#if [ -e /etc/httpd/conf.d/virtual6.${USERNAME}.conf ]; then
-#	/usr/local/sbin/uberspace-account-add-domain6.sh -u ${USERNAME} -d ${DOMAIN}
-#fi
 

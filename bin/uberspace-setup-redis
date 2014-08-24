@@ -1,7 +1,5 @@
 #!/bin/bash
 
-# missing license from uberspace. see https://twitter.com/maltejk/status/377051331653275649
-
 MYUID=`id -u`
 
 if [ "$MYUID" = "0" ] ; then
@@ -9,13 +7,13 @@ if [ "$MYUID" = "0" ] ; then
   exit 1
 fi
 
-if [ ! -d ~/.service ] ; then
-  echo "You don't have a ~/.service directory."
+if [ ! -d ~/service ] ; then
+  echo "You don't have a ~/service directory."
   echo "Please run \"uberspace-setup-svscan\" first to initialize daemon-tools before setting up Redis."
   exit 1
 fi
 
-for DIR in ~/.redis ~/.service/redis ~/.etc/run-redis ; do
+for DIR in ~/.redis ~/service/redis ~/etc/run-redis ; do
   if [ -d $DIR ] ; then
     echo "You already have a $DIR directory. Nothing to do here."
     exit 1
@@ -36,24 +34,24 @@ logfile stdout
 port 0
 __EOF__
 
-mkdir ~/.etc/run-redis
-cat <<__EOF__ > ~/.etc/run-redis/run
+mkdir ~/etc/run-redis
+cat <<__EOF__ > ~/etc/run-redis/run
 #!/bin/sh
 exec redis-server ~/.redis/conf 2>&1
 __EOF__
-chmod 755 ~/.etc/run-redis/run
+chmod 755 ~/etc/run-redis/run
 
 # Create the logging-script for redis/daemon-tools
-echo "Creating the ~/.etc/run-redis/log/run logging run script"
-mkdir ~/.etc/run-redis/log
-cat <<__EOF__ > ~/.etc/run-redis/log/run
+echo "Creating the ~/etc/run-redis/log/run logging run script"
+mkdir ~/etc/run-redis/log
+cat <<__EOF__ > ~/etc/run-redis/log/run
 #!/bin/sh
 exec multilog t ./main
 __EOF__
-chmod 755 ~/.etc/run-redis/log/run
+chmod 755 ~/etc/run-redis/log/run
 
-echo "Creating symlink for ~/.etc/run-redis to ~/.service/redis to start the service"
-ln -s ../.etc/run-redis ~/.service/redis
+echo "Creating symlink for ~/etc/run-redis to ~/service/redis to start the service"
+ln -s ../etc/run-redis ~/service/redis
 
 # Check if redis-service starts sucessfully
 WAIT=0
@@ -61,7 +59,7 @@ echo -n "Waiting for Redis to start..."
 while [ $WAIT -lt 6 ]; do
   WAIT=$(($WAIT+1))
   echo -n "."
-  svok ~/.service/redis 2>/dev/null
+  svok ~/service/redis 2>/dev/null
   SVOK=$?
   if [ "$SVOK" = "0" ] ; then
     break
@@ -84,4 +82,4 @@ echo
 echo "To connect to redis via socket, use:"
 echo
 echo "redis-cli -s ~/.redis/sock"
-echo
+echo 

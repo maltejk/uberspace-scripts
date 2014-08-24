@@ -1,24 +1,20 @@
-#!/bin/bash
+#!/bin/sh
+########################################################################
+# 2012-04-15 Christopher Hirschmann c.hirschmann@jonaspasche.com
 ########################################################################
 #
-# 2010-10-01
-# Christopher Hirschmann
-# c.hirschmann@jonaspasche.com
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
 #
-########################################################################
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
 #
-#	This program is free software: you can redistribute it and/or modify
-#	it under the terms of the GNU General Public License as published by
-#	the Free Software Foundation, either version 3 of the License, or
-#	(at your option) any later version.
-#
-#	This program is distributed in the hope that it will be useful,
-#	but WITHOUT ANY WARRANTY; without even the implied warranty of
-#	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#	GNU General Public License for more details.
-#
-#	You should have received a copy of the GNU General Public License
-#	along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 ########################################################################
 #
@@ -70,16 +66,15 @@ then
 	exit 2;
 fi
 
-POOL="/etc/ipv6-address-pool/index.txt";
+## this includes host specific variables
+. /usr/local/sbin/uberspace-account-local-settings.sh;
 
-## check wether IPv6 was activated for this user
-if [ ! -e /etc/apache2/vhosts.d/virtual6.${USERNAME}.conf ]; then
-    echo "Error: /etc/apache2/vhosts.d/virtual6.${USERNAME}.conf doesn't exist.";
-    exit 1;
-fi
-if [ ! -e /etc/apache2/vhosts.d/ssl6.${USERNAME}.conf ]; then
-    echo "Error: /etc/apache2/vhosts.d/ssl6.${USERNAME}.conf doesn't exist.";
-    exit 1;
+## check wether IPv6 was activated for this user, Uberspace-CentOS-5-style
+if [ ! -e /etc/httpd/conf.d/virtual6.${USERNAME}.conf ]; then
+  #echo "Info: /etc/httpd/conf.d/virtual6.${USERNAME}.conf doesn't exist. If this a CentOS 6 Uberspace host, then that's OK.";
+  if ! [ "`grep \"CentOS release 6\" /etc/redhat-release`" ] ; then
+    echo "Info: /etc/httpd/conf.d/virtual6.${USERNAME}.conf doesn't exist.";
+  fi
 fi
 
 ## determine IPv6 address(es)
@@ -91,4 +86,3 @@ if [ "$BURNEDADDRESS" == "" ]; then
 fi
 
 echo -e "$BURNEDADDRESS"
-exit 0;

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 ########################################################################
 #
 # 2011-03-03
@@ -31,12 +31,12 @@ if [ "`id -u`" = "0" ] ; then
   exit 1
 fi
 
-if [ -d ~/.service ] ; then
-  echo "You already have a ~/.service directory"
+if [ -e ~/service ] ; then
+  echo "You already have a ~/service directory"
   exit 2
 fi
 
-mkdir ~/.service
+mkdir ~/service
 
 # -n prevents from asking for a password if /etc/sudoers isn't configured correctly yet
 sudo -n /usr/local/sbin/uberspace-setup-svscan-helper

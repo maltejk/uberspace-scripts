@@ -1,24 +1,20 @@
-#!/bin/bash
+#!/bin/sh
+########################################################################
+# 2012-04-15 Christopher Hirschmann c.hirschmann@jonaspasche.com
 ########################################################################
 #
-# 2011-04-06
-# Christopher Hirschmann
-# c.hirschmann@jonaspasche.com
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
 #
-########################################################################
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
 #
-#       This program is free software: you can redistribute it and/or modify
-#       it under the terms of the GNU General Public License as published by
-#       the Free Software Foundation, either version 3 of the License, or
-#       (at your option) any later version.
-#
-#       This program is distributed in the hope that it will be useful,
-#       but WITHOUT ANY WARRANTY; without even the implied warranty of
-#       MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#       GNU General Public License for more details.
-#
-#       You should have received a copy of the GNU General Public License
-#       along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 ########################################################################
 #
@@ -36,12 +32,21 @@
 
 function cantcreate ()
 {
-	echo "Error. Couldn't create $POOLFILE";
+	echo "Error. Couldn't create $POOL";
 	exit 126;
 }
 
-POOLFILE="/etc/ipv6-address-pool/index.txt";
-USAGE="Usage:\n-h\t\tthis help message\n-d ethX\t\tnetwork device\n-f int\t\taddress to start from (1..65534)\n-i file\t\tindex file containing IPv6 address pool index, default: $POOLFILE\n-p 2a02::1234\t\tIPv6 address prefix with last block missing\n-t int\t\taddress to end with (1..65534)\n";
+function cantcreatedir ()
+{
+	echo "Error. Couldn't create $POOLDIR";
+	exit 128;
+}
+
+## this includes host specific variables
+. /usr/local/sbin/uberspace-account-local-settings.sh;
+
+POOL="/etc/ipv6-address-pool/index.txt";
+USAGE="Usage:\n-h\t\tthis help message\n-d ethX\t\tnetwork device\n-f int\t\taddress to start from (1..65534)\n-i file\t\tindex file containing IPv6 address pool index, default: $POOL\n-p 2a02::1234\t\tIPv6 address prefix with last block missing\n-t int\t\taddress to end with (1..65534)\n";
 
 if [ ! $# -ge 1 ];
 then
@@ -64,7 +69,7 @@ while getopts ":hd:f:i:p:t:" Option; do
 			declare -i COUNTFROM=${OPTARG};
 			;;
 		i)
-			POOLFILE=${OPTARG};
+			POOL=${OPTARG};
 			;;
 		p)
 			PREFIX=${OPTARG};
@@ -84,6 +89,8 @@ while getopts ":hd:f:i:p:t:" Option; do
 done
 
 shift $(($OPTIND - 1))
+
+POOLDIR=`dirname $POOL`;
 
 if [ -z $INTERFACE ]; then
 	echo "Error. No interface given.";
@@ -150,15 +157,21 @@ if [ "$CONFIGNOTREADY" == "1" ]; then
 	echo "IPV6ADDR_SECONDARIES=\"\"" >> $CONFIGFILE || exit 123;
 fi
 
+# check if the directory for the pool index file exists, create it if it doesn't
+if [[ ! -d $POOLDIR ]]; then
+	echo "$POOLDIR doesn't exist yet. I'm going to create it.";
+	mkdir -p -m 0700 $POOLDIR || cantcreatedir;
+fi
+
 # check if the IPv6 address pool index file exists, create it if it doesn't.
-if [[ ! -a $POOLFILE ]]; then
-	echo "$POOLFILE doesn't exist yet. I'm going to create it."
-	touch $POOLFILE || cantcreate;
+if [[ ! -a $POOL ]]; then
+	echo "$POOL doesn't exist yet. I'm going to create it."
+	touch $POOL || cantcreate;
 fi
 
 # check if the poolfile is writeable
-if [[ ! -w $POOLFILE ]]; then
-	echo "Error. $POOLFILE isn't writable."
+if [[ ! -w $POOL ]]; then
+	echo "Error. $POOL isn't writable."
 	exit 125;
 fi
 
@@ -167,8 +180,8 @@ fi
 		H=$(printf "%X\n" $COUNTFROM);
 		CURRENTIP=`echo "${PREFIX}:${H}" | tr "[:upper:]" "[:lower:]"`;
 
-# make sure that the address isn't already in the poolfile
-		grep -q "${CURRENTIP} " $POOLFILE;
+# make shure that the address isn't already in the poolfile
+		grep -q "${CURRENTIP} " $POOL;
 		INPOOL=$?;
 		if [ "$INPOOL" == "1" ]; then
 
@@ -176,20 +189,20 @@ fi
 			grep -q "${CURRENTIP}" $CONFIGFILE;
 			INCONFIG=$?;
 			if [ "$INCONFIG" == "1" ]; then
-		
+
 # add address to config
 				sed -i -e 's/IPV6ADDR_SECONDARIES=\"/&'"${CURRENTIP}"' /' $CONFIGFILE;
 # add address to interface
 #				echo "ip -6 addr add ${CURRENTIP}/64 dev ${INTERFACE}";
 				ip -6 addr add ${CURRENTIP}/64 dev ${INTERFACE};
 # add address to pool
-				echo "$CURRENTIP free" >> $POOLFILE;
+				echo "$CURRENTIP free" >> $POOL;
 				((SUCCESSFUL=SUCCESSFUL+1));
 			else
 				echo "Not adding ${CURRENTIP}, because it is already in ${CONFIGFILE}.";
 			fi
 		else
-			echo "Not adding ${CURRENTIP}, because is is already in ${POOLFILE}."
+			echo "Not adding ${CURRENTIP}, because is is already in ${POOL}."
 		fi
 		((COUNTFROM=COUNTFROM+1));
 	done

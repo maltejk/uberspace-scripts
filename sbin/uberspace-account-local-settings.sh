@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 ########################################################################
 #
 # 2010-09-01
@@ -30,6 +30,8 @@
 ########################################################################
 
 # this is just an example to show how this file should look
-HOSTIP=176.221.43.145
-HOSTNAME=jb.mjk.me
-SERVERADMIN=malte@maltejk.de
+HOSTIP=95.143.172.53
+HOSTNAME=scorpius.uberspace.de
+SERVERADMIN=support@uberspace.de
+POOL="/etc/ipv6-address-pool/index.txt"
+DEFAULTPOSTGRES="9.3";

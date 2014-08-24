@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 ########################################################################
 #
 # 2011-09-26
@@ -74,20 +74,20 @@ phpize      || error "phpize failed"
 ./configure || error "./configure failed"
 make        || error "make failed"
 
-if [ ! -f ~/.etc/php.ini ] ; then
+if [ ! -f ~/etc/php.ini ] ; then
   PHPLIBDIR=`php --ini | head -1 | awk -F ": " '{ print $2 }'`
-  echo -n "Copying $PHPLIBDIR/php.ini to ~/.etc ... "
-  cp -a $PHPLIBDIR/php.ini ~/.etc/ || error "Copying $PHPLIBDIR/php.ini failed"
+  echo -n "Copying $PHPLIBDIR/php.ini to ~/etc ... "
+  cp -a $PHPLIBDIR/php.ini ~/etc/ || error "Copying $PHPLIBDIR/php.ini failed"
   echo "done"
 fi
 
-EXT_DIR=`grep ^extension_dir ~/.etc/php.ini | sed 's/.*= *//' | sed 's/"//g'`
+EXT_DIR=`grep ^extension_dir ~/etc/php.ini | sed 's/.*= *//' | sed 's/"//g'`
 
 # case: "unconfigured extension_dir"
 if [ "$EXT_DIR" = "" ] ; then
   EXT_DIR=$HOME/pecl
   echo -n "Configuring your extension_dir to $EXT_DIR ... "
-  echo "extension_dir = $EXT_DIR" >> ~/.etc/php.ini
+  echo "extension_dir = $EXT_DIR" >> ~/etc/php.ini
   echo "done"
 fi
 
@@ -95,7 +95,7 @@ fi
 if [ "$EXT_DIR" = "./" ] ; then
   EXT_DIR=$HOME/pecl
   echo -n "Changing your extension_dir to $EXT_DIR ... "
-  perl -pi -e "s|^extension_dir.*|extension_dir = $EXT_DIR|" ~/.etc/php.ini
+  perl -pi -e "s|^extension_dir.*|extension_dir = $EXT_DIR|" ~/etc/php.ini
   echo "done"
 fi
 
@@ -112,8 +112,8 @@ cp -a $MODULES $EXT_DIR || error "Installing $MODULES to $EXT_DIR failed"
 echo "done"
 
 for MODULE in $MODULES ; do
-  echo -n "Activating $MODULE in ~/.etc/php.ini ... "
-  echo "extension=$MODULE" >> ~/.etc/php.ini
+  echo -n "Activating $MODULE in ~/etc/php.ini ... "
+  echo "extension=$MODULE" >> ~/etc/php.ini
   echo "done"
 done
 

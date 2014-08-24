@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 ########################################################################
 #
 # 2011-21-21
@@ -22,7 +22,7 @@
 #
 #########################################################################
 #
-# This script will disable a Uberspace (http only).
+# This script will disable a Uberspace.
 #
 #########################################################################
 
@@ -69,25 +69,57 @@ then
 	exit 2;
 fi
 
-VHOSTCONF="/etc/httpd/conf.d/virtual.${USERNAME}.conf";
 
-VHOSTCOUNT=`grep -c "^<VirtualHost" $VHOSTCONF`
-VHOSTDISABLED=`sed -n '/^DocumentRoot/{n;p;}' $VHOSTCONF | grep -c "Include /etc/httpd/conf/uberspace-disabled.conf"`
-if [ $VHOSTDISABLED = $VHOSTCOUNT ] ; then
-  echo -e "OK Uberspace ist bereits deaktiviert"
-  exit 0;
-elif [ $VHOSTDISABLED = 0 ] ; then
-  perl -pi -e "s/^DocumentRoot (.*)/DocumentRoot \$1\nInclude \/etc\/httpd\/conf\/uberspace-disabled.conf/g" $VHOSTCONF;
-  echo -e "OK Alles erledigt"
-  touch /root/please_restart_httpd;
-  exit 0;
+USERHOME="/home/${USERNAME}";
+USERWEBHOME="/var/www/virtual/${USERNAME}";
+ 
+if (`test -d ${USERHOME}` && `test -d ${USERWEBHOME}`) ; then 
+  DISABLED=
+
+  # cron
+  crontab -u ${USERNAME} -l > ${USERHOME}/.crontab-disabled
+  crontab -u ${USERNAME} -r
+
+  # ~/service
+  if (`test -d /etc/run-svscan-${USERNAME}`) ; then
+    /usr/local/bin/svc -d /service/svscan-${USERNAME}
+    sleep 3
+    touch /etc/run-svscan-${USERNAME}/down
+  fi
+
+  # killall jobs from user
+  pkill -u ${USERNAME}
+
+
+  # homedir
+  if [ "`stat --printf=%U ${USERHOME}`" = "${USERNAME}" ] ; then
+    chown root.root ${USERHOME}
+  else
+    DISABLED=1
+  fi
+  chmod 700 ${USERHOME}
+
+  # webdir
+  if [ "`stat --printf=%U ${USERWEBHOME}`" = "${USERNAME}" ] ; then
+    chown root.root ${USERWEBHOME}
+  else
+    DISABLED=1
+  fi
+  chmod 700 ${USERWEBHOME}
+
+
+  # just to be safe
+  pkill -9 -u ${USERNAME}
+
+  if [ $DISABLED ] ; then
+    echo -e "OK Uberspace wurde bereits deaktiviert"
+    exit 0;
+  else 
+    echo -e "OK Uberspace ist deaktiviert"
+    exit 0;
+  fi
 else
-  echo -e "WARNUNG Teilsperrung gefunden (VirtualHosts: $VHOSTCOUNT, davon bereits deaktiviert: $VHOSTDISABLED). Bitte von Hand prüfen."
-  exit 0;
+  echo "No userdir ${USERHOME} or userwebdir ${USERWEBHOME} found!"
+  exit 2;
 fi
-
-## if the following file exists, asume that IPv6 is enabled for that account and call uberspace-account-add-domain6.sh
-#if [ -e /etc/httpd/conf.d/virtual6.${USERNAME}.conf ]; then
-#	/usr/local/sbin/uberspace-account-add-domain6.sh -u ${USERNAME} -d ${DOMAIN}
-#fi
 

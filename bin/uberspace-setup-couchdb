@@ -1,10 +1,6 @@
-#!/bin/bash
+#!/bin/sh
 ########################################################################
-#
-# 2011-03-24
-# Jonas Pasche
-# jpasche@jonaspasche.com
-#
+# 2014-07-29 Moritz Werner mwerner@jonaspasche.com
 ########################################################################
 #
 #	This program is free software: you can redistribute it and/or modify
@@ -39,7 +35,7 @@ if [ ! -d ~/service ] ; then
   exit 2
 fi
 
-for DIR in ~/couchdb ~/.service/couchdb ~/.etc/run-couchdb ; do
+for DIR in ~/couchdb ~/service/couchdb ~/etc/run-couchdb ; do
   if [ -d $DIR ] ; then
     echo "You already have a $DIR directory. Nothing to do here."
     exit 3
@@ -56,27 +52,77 @@ COUCHDB_USER="`id -un`_couchadmin"
 COUCHDB_PASS=`apg -n 1`
 
 # create couchdb.ini
-echo "Creating the ~/couchdb.ini configuration file"
-sed -r "s/\/var\/(lib|log)/\/home\/$USER/; s/5984/$COUCHDB_PORT/; s/require_valid_user = .*/require_valid_user = true/;" < /etc/couchdb/default.ini > ~/couchdb.ini
+cat <<__EOF__ > ~/couchdb.ini
+[couchdb]
+database_dir = /home/$USER/couchdb
+view_index_dir = /home/$USER/couchdb
+uri_file = /home/$USER/couchdb/couch.uri
 
-# the password automatically gets replaces by a hashed string upon the first CouchDB start!
-cat <<__EOF__ >> ~/couchdb.ini
+[log]
+file = /home/$USER/couchdb/couch.log
+
+[httpd]
+port = $COUCHDB_PORT
 
 [admins]
 $COUCHDB_USER = $COUCHDB_PASS
+
+[couch_httpd_auth]
+require_valid_user = true
 __EOF__
 
-# replaced duplicate create-service-code here
-uberspace-setup-service couchdb couchdb -n -a $HOME/couchdb.ini
+# create the couchdb service run script
+echo "Creating the ~/etc/run-couchdb/run service run script"
+mkdir ~/etc/run-couchdb
+cat <<__EOF__ > ~/etc/run-couchdb/run
+#!/bin/sh
+export HOME=$HOME
+export COUCHPATH="/package/host/localhost/couchdb-1.5/"
+
+exec \$COUCHPATH/bin/couchdb -n -a \$COUCHPATH/etc/couchdb/default.ini -a $HOME/couchdb.ini 2>&1
+__EOF__
+chmod 755 ~/etc/run-couchdb/run
+
+# create the couchdb logging run script
+echo "Creating the ~/etc/run-couchdb/log/run logging run script"
+mkdir ~/etc/run-couchdb/log
+cat <<__EOF__ > ~/etc/run-couchdb/log/run
+#!/bin/sh
+exec multilog t ./main
+__EOF__
+chmod 755 ~/etc/run-couchdb/log/run
+
+echo "Symlinking ~/etc/run-couchdb to ~/service/couchdb to start the service"
+ln -s ../etc/run-couchdb ~/service/couchdb
+
+WAIT=0
+echo -n "Waiting for the service to start ..."
+while [ $WAIT -lt 6 ]; do
+  WAIT=$(($WAIT+1))
+  echo -n " $WAIT"
+  svok ~/service/couchdb 2>/dev/null
+  SVOK=$?
+  if [ "$SVOK" = "0" ] ; then
+    break
+  fi
+  sleep 1
+done
+
+if [ "$SVOK" != "0" ] ; then
+  echo " failed :-("
+  echo "We're really sorry; this shouldn't have happened - please contact hallo@uberspace.de for help. Thanks a lot!"
+  exit 4
+fi
 
 # final information
 echo
 echo "Congratulations - You can now reach your dedicated CouchDB installation!"
 echo "Please note that your CouchDB uses the NON-standard port number $COUCHDB_PORT."
-echo "This allows running multiple instances of CouchDB on the same machine for different users."
 echo
 echo "Hostname: localhost"
-echo "Portnum#: $COUCHDB_PORT"
+echo " Portnum: $COUCHDB_PORT"
 echo "Username: $COUCHDB_USER"
 echo "Password: $COUCHDB_PASS"
-echo
+echo ""
+echo "Settings: $HOME/couchdb.ini"
+echo " Logfile: /home/$USER/couchdb/couch.log"

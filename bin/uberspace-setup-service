@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 ########################################################################
 #
 # 2011-03-03
@@ -26,8 +26,6 @@
 #
 ########################################################################
 
-source /usr/local/sbin/uberspace-account-local-settings.sh
-
 usage() {
   echo "Usage: $0 <servicename> <command> [<args> ...]"
   echo "for example: $0 mydaemon ~/bin/daemon"
@@ -37,9 +35,7 @@ usage() {
 SERVICENAME=$1
 shift
 
-# not working. bash fucked up shit or so
-#if [[ ! "$SERVICENAME" =~ "^[a-z]" ]] ; then
-if [[ -z "`echo "$SERVICENAME" | egrep '^[a-z]'`" ]] ; then 
+if [[ ! "$SERVICENAME" =~ "^[a-z]" ]] ; then
   usage
 fi
 
@@ -57,12 +53,12 @@ if [ "$COMMAND" = "" ] ; then
   exit 1
 fi
 
-if [ ! -d ~/.service ] ; then
-  echo "You don't seem to have a ~/.service directory. Did you execute uberspace-setup-svscan before?"
+if [ ! -d ~/service ] ; then
+  echo "You don't seem to have a ~/service directory. Did you execute uberspace-setup-svscan before?"
   exit 2
 fi
 
-for DIR in ~/.etc/run-$SERVICENAME ~/.service/$SERVICENAME ; do
+for DIR in ~/etc/run-$SERVICENAME ~/service/$SERVICENAME ; do
   if [ -d $DIR ] ; then
     echo "The $DIR directory already exists"
     exit 2
@@ -74,40 +70,40 @@ if [ ! -x $COMMAND ] ; then
   exit 3
 fi
 
-echo "Creating the ~/.etc/run-$SERVICENAME/run service run script"
-mkdir ~/.etc/run-$SERVICENAME
-cat <<__EOF__ > ~/.etc/run-$SERVICENAME/run
-#!/bin/bash
+echo "Creating the ~/etc/run-$SERVICENAME/run service run script"
+mkdir ~/etc/run-$SERVICENAME
+cat <<__EOF__ > ~/etc/run-$SERVICENAME/run
+#!/bin/sh
 
 # These environment variables are sometimes needed by the running daemons
 export USER=$USER
 export HOME=$HOME
 
-# Include the user-specific profile, it's actually called .profile on debian.
-. \$HOME/.profile
+# Include the user-specific profile
+. \$HOME/.bash_profile
 
 # Now let's go!
 exec $COMMAND $@ 2>&1
 __EOF__
-chmod +x ~/.etc/run-$SERVICENAME/run
+chmod +x ~/etc/run-$SERVICENAME/run
 
-echo "Creating the ~/.etc/run-$SERVICENAME/log/run logging run script"
-mkdir ~/.etc/run-$SERVICENAME/log
-cat <<__EOF__ > ~/.etc/run-$SERVICENAME/log/run
-#!/bin/bash
+echo "Creating the ~/etc/run-$SERVICENAME/log/run logging run script"
+mkdir ~/etc/run-$SERVICENAME/log
+cat <<__EOF__ > ~/etc/run-$SERVICENAME/log/run
+#!/bin/sh
 exec multilog t ./main
 __EOF__
-chmod +x ~/.etc/run-$SERVICENAME/log/run
+chmod +x ~/etc/run-$SERVICENAME/log/run
 
-echo "Symlinking ~/.etc/run-$SERVICENAME to ~/.service/$SERVICENAME to start the service"
-ln -s ../.etc/run-$SERVICENAME ~/.service/$SERVICENAME
+echo "Symlinking ~/etc/run-$SERVICENAME to ~/service/$SERVICENAME to start the service"
+ln -s ../etc/run-$SERVICENAME ~/service/$SERVICENAME
 
 WAIT=0
 echo -n "Waiting for the service to start ..."
 while [ $WAIT -lt 7 ]; do
   WAIT=$(($WAIT+1))
   echo -n " $WAIT"
-  svok ~/.service/$SERVICENAME
+  /command/svok ~/service/$SERVICENAME
   SVOK=$?
   if [ "$SVOK" = "0" ] ; then
     break
@@ -129,19 +125,19 @@ echo "Congratulations - the ~/service/$SERVICENAME service is now ready to use!"
 echo "To control your service you'll need the svc command (hint: svc = service control):"
 echo
 echo "To start the service (hint: u = up):"
-echo "  svc -u ~/.service/$SERVICENAME"
+echo "  svc -u ~/service/$SERVICENAME"
 echo "To stop the service (hint: d = down):"
-echo "  svc -d ~/.service/$SERVICENAME"
+echo "  svc -d ~/service/$SERVICENAME"
 echo "To reload the service (hint: h = HUP):"
-echo "  svc -h ~/.service/$SERVICENAME"
+echo "  svc -h ~/service/$SERVICENAME"
 echo "To restart the service (hint: du = down, up):"
-echo "  svc -du ~/.service/$SERVICENAME"
+echo "  svc -du ~/service/$SERVICENAME"
 echo
 echo "To remove the service:"
-echo "  cd ~/.service/$SERVICENAME"
-echo "  rm ~/.service/$SERVICENAME"
+echo "  cd ~/service/$SERVICENAME"
+echo "  rm ~/service/$SERVICENAME"
 echo "  svc -dx . log"
-echo "  rm -rf ~/.etc/run-$SERVICENAME"
+echo "  rm -rf ~/etc/run-$SERVICENAME"
 echo
 echo "More information about controlling daemons can be found here:"
 echo "https://uberspace.de/dokuwiki/system:daemontools#wenn_der_daemon_laeuft"

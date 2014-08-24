@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 umask 0077
 if [ "$VUSER" = "" ] ; then
   echo $TCPREMOTEIP > $HOME/Maildir/last_smtp

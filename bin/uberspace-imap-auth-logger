@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 umask 0077
 REALHOME=`echo $HOME | sed 's/::/:/g;'`
