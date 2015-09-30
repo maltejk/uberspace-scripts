@@ -4,6 +4,6 @@ an approach, to make https://uberspace.de system configuration awesomeness usabl
 
 Possible install method:
 
-<code>
+
 ( cd /usr/local; git clone https://github.com/maltejk/uberspace-scripts.git; cd /usr/local/bin ; for script in ../uberspace-scripts/bin/*; do ln -s $script; done; cd /usr/local/sbin ; for script in ../uberspace-scripts/sbin/*; do ln -s $script ; done; echo "ALL ALL=(ALL:ALL) NOPASSWD: /usr/local/sbin/uberspace-setup-svscan-helper" > /etc/sudoers.d/uberspace-setup-svscan-helper ; chmod 640 /etc/sudoers.d/uberspace-setup-svscan-helper )
-</code>
+
